@@ -65,13 +65,8 @@ def main():
     print(f"[INFO]: Gym observation space: {env.observation_space}")
     print(f"[INFO]: Gym action space: {env.action_space}")
     # TODO: adjust parameters during runtime
-    # TODO: change default position and reset
-    # reset environment
-
-    env.reset()
 
     articulation = env.unwrapped.scene["robot"]
-
     joint_names = IDENTIFIED_JOINTS
     joint_ids = [articulation.joint_names.index(name) for name in joint_names]
 
@@ -84,6 +79,13 @@ def main():
     measured_dof_pos = data["dof_pos"].to(env.unwrapped.device)
     num_steps = time_data.shape[0]
     sim_dt = env.unwrapped.sim.cfg.dt
+
+    # reset environment with first position from data
+    tmp = env.unwrapped.scene.articulations["robot"]._data.default_joint_pos
+    env.unwrapped.scene.articulations["robot"]._data.default_joint_pos[0, joint_ids] = measured_dof_pos[0, :]
+    print(measured_dof_pos[0, :])
+    env.reset()
+    env.unwrapped.scene.articulations["robot"]._data.default_joint_pos = tmp
 
     counter = 0
     # simulate environment

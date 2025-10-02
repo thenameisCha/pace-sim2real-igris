@@ -73,7 +73,18 @@ def main():
     joint_names = IDENTIFIED_JOINTS
     joint_ids = [articulation.joint_names.index(name) for name in joint_names]
 
+    friction = torch.tensor([0.1] * len(joint_ids), device=env.unwrapped.device).unsqueeze(0)
+    armature = torch.tensor([0.1] * len(joint_ids), device=env.unwrapped.device).unsqueeze(0)
+    damping = torch.tensor([4.5] * len(joint_ids), device=env.unwrapped.device).unsqueeze(0)
+
     env.reset()
+
+    articulation.write_joint_friction_coefficient_to_sim(friction, joint_ids, env_ids=torch.tensor([0]))
+    articulation.data.default_joint_friction[:, joint_ids] = friction
+    articulation.write_joint_armature_to_sim(armature, joint_ids, env_ids=torch.arange(len(armature)))
+    articulation.data.default_joint_armature[:, joint_ids] = armature
+    articulation.write_joint_viscous_friction_coefficient_to_sim(damping, joint_ids, env_ids=torch.arange(len(damping)))
+    articulation.data.default_joint_viscous_friction_coeff[:, joint_ids] = damping
 
     project_data_dir = "anymal_sim"
     data_dir = project_root() / "data" / project_data_dir
@@ -96,18 +107,6 @@ def main():
 
     trajectory = torch.zeros((num_steps, 12), device=env.unwrapped.device)
     trajectory[:, :] = chirp_signal.unsqueeze(-1)
-    # trajectory[:, joint_ids[0]] *= 1.0  # LF_HAA
-    # trajectory[:, joint_ids[1]] *= 1.0  # LF_HFE
-    # trajectory[:, joint_ids[2]] *= 1.0  # LF_KFE
-    # trajectory[:, joint_ids[3]] *= -1.0  # RF_HAA
-    # trajectory[:, joint_ids[4]] *= 1.0  # RF_HFE
-    # trajectory[:, joint_ids[5]] *= 1.0  # RF_KFE
-    # trajectory[:, joint_ids[6]] *= 1.0  # LH_HAA
-    # trajectory[:, joint_ids[7]] *= -1.0  # LH_HFE
-    # trajectory[:, joint_ids[8]] *= -1.0  # LH_KFE
-    # trajectory[:, joint_ids[9]] *= -1.0  # RH_HAA
-    # trajectory[:, joint_ids[10]] *= -1.0  # RH_HFE
-    # trajectory[:, joint_ids[11]] *= -1.0  # RH_KFE
     trajectory_directions = torch.tensor(
         [1.0, 1.0, 1.0, -1.0, 1.0, 1.0, 1.0, -1.0, -1.0, -1.0, -1.0, -1.0],
         device=env.unwrapped.device
@@ -145,7 +144,7 @@ def main():
 
     # close the simulator
     env.close()
-    
+
     from time import sleep
     sleep(1)  # wait a bit for everything to settle
 
