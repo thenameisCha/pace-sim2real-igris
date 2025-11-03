@@ -1,0 +1,85 @@
+import torch
+import matplotlib.pyplot as plt
+import re
+from pathlib import Path
+
+import argparse
+
+# add argparse arguments
+parser = argparse.ArgumentParser(description="Pace agent for Isaac Lab environments.")
+parser.add_argument("--folder_name", type=str, default=None, help="Name of the folder to use.")
+parser.add_argument("--params_name", type=str, default=None, help="Name of the parameters file to use.")
+parser.add_argument("--robot_name", type=str, default="anymal_d", help="Name of the robot.")
+
+args = parser.parse_args()
+folder_name = args.folder_name
+params_name = args.params_name
+robot_name = args.robot_name
+
+current_dir = Path(__file__).parent.resolve()
+project_root = current_dir.parent.parent
+
+# folder_name = "25_10_24_12-05-07"
+log_dir = project_root / "logs" / "pace" / robot_name
+
+if not log_dir.exists():
+    raise FileNotFoundError(f"No logs for robot {robot_name} under {log_dir}")
+
+_pattern = re.compile(r"^params_(\d+)\.pt$")
+
+
+def find_latest_params(root: Path):
+    best = None  # tuple (int, Path)
+    for p in root.rglob("params_*.pt"):
+        m = _pattern.match(p.name)
+        if not m:
+            continue
+        num = int(m.group(1))
+        if best is None or num > best[0]:
+            best = (num, p)
+    return None if best is None else best[1]
+
+
+# if no folder_name given, pick the most recent run folder for the robot
+if not folder_name:
+    robot_dir = log_dir
+    candidates = [p for p in robot_dir.iterdir() if p.is_dir()]
+    if not candidates:
+        raise FileNotFoundError(f"No run folders found under {robot_dir}")
+    latest_folder = max(candidates, key=lambda p: p.stat().st_mtime)
+    folder_name = latest_folder.name
+
+# now point log_dir at the chosen robot/run folder
+log_dir = log_dir / folder_name
+
+if params_name is None:
+    params_path = find_latest_params(log_dir)
+else:
+    params_path = log_dir / params_name
+    if not params_path.exists():
+        raise FileNotFoundError(f"Given params file {params_path} does not exist")
+if params_path is None:
+    raise FileNotFoundError(f"No params_*.pt files found under {log_dir}")
+print(f"Latest params file: {params_path}")
+
+params = torch.load(params_path)
+config = torch.load(log_dir / "config.pt")
+
+joint_names = config["joint_names"]
+trajectories = params["best_trajectory"]  # time x joints
+real_trajectories = config["dof_pos"]  # time x joints
+target_trajectories = config["des_dof_pos"]  # time x joints
+
+for i in range(trajectories.shape[1]):
+    plt.figure()
+    plt.plot(trajectories[:, i].cpu().numpy(), label="Sim")
+    plt.plot(real_trajectories[:, i].cpu().numpy(), label="Real")
+    plt.plot(target_trajectories[:, i].cpu().numpy(), c="grey", label="Target", linestyle="--")
+    plt.title(f"Joint {joint_names[i]}")  # Use joint names from config
+    plt.xlabel("Time step")
+    plt.ylabel("Position (rad)")
+    plt.legend()
+    plt.grid()
+    plt.show()
+
+print("Plotting complete.")
