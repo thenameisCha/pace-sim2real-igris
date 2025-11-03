@@ -66,12 +66,13 @@ class CMAESOptimizer:
     def evolve(self):
         self.scores /= self.scores_counter
         self.scores_buffer[self.iteration_counter, :] = self.scores
+        self.params_buffer[self.iteration_counter, :, :] = self.sim_params
         solutions = []
         for i in range(self.optimizer.population_size):
             solutions.append((self.params[i].cpu().numpy(), self.scores[i].item()))
         self.optimizer.tell(solutions)
         if self.save_interval > 0 and self.iteration_counter % self.save_interval == 0:
-            self.save_checkpoint(torch.tensor(self.optimizer._mean), self.sim_params_buffer, self.scores_buffer, self.iteration_counter)
+            self.save_checkpoint(torch.tensor(self._params_to_sim_params(self.optimizer._mean)), self.sim_params_buffer, self.scores_buffer, self.iteration_counter)
         self._print_iteration()
 
         self._reset_population()
@@ -91,7 +92,7 @@ class CMAESOptimizer:
         finished = finished or (self.epsilon is not None and diff_score < self.epsilon)
         if finished:
             print("CMA-ES optimization finished.")
-            self.save_checkpoint(torch.tensor(self.optimizer._mean), self.sim_params_buffer, self.scores_buffer, self.iteration_counter - 1)
+            self.save_checkpoint(torch.tensor(self._params_to_sim_params(self.optimizer._mean)), self.sim_params_buffer, self.scores_buffer, self.iteration_counter - 1)
         return finished
 
     def _reset_population(self):
