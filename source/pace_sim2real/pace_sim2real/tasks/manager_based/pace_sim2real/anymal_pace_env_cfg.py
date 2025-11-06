@@ -19,7 +19,7 @@ ANYDRIVE_3_SIMPLE_ACTUATOR_CFG = PaceDCMotorCfg(
 
 
 @configclass
-class ANYmalDPaceEnvCfg(PaceSim2realSceneCfg):
+class ANYmalDPaceSceneCfg(PaceSim2realSceneCfg):
     """Configuration for Anymal-D robot in Pace Sim2Real environment."""
     robot: ArticulationCfg = ANYMAL_D_CFG.replace(prim_path="{ENV_REGEX_NS}/Robot", init_state=ArticulationCfg.InitialStateCfg(pos=(0.0, 0.0, 1.0)),
                                                   actuators={"legs": ANYDRIVE_3_SIMPLE_ACTUATOR_CFG})
@@ -28,7 +28,7 @@ class ANYmalDPaceEnvCfg(PaceSim2realSceneCfg):
 @configclass
 class AnymalDPaceEnvCfg(PaceSim2realEnvCfg):
 
-    scene: ANYmalDPaceEnvCfg = ANYmalDPaceEnvCfg()
+    scene: ANYmalDPaceSceneCfg = ANYmalDPaceSceneCfg()
 
     def __post_init__(self):
         # post init of parent
