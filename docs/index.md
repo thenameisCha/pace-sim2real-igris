@@ -8,6 +8,19 @@
 Welcome to the documentation for **PACE**, a systematic sim-to-real pipeline for diverse legged robots.  
 PACE provides unified tools for accurate actuator modeling, automatic system identification for seamless deployment of RL controllers to real hardware.
 
+<div class="video-wrapper">
+  <video autoplay muted loop playsinline>
+    <source src="assets/teaser_web.mp4" type="video/mp4">
+  </video>
+
+  <a class="youtube-overlay"
+     href="https://youtu.be/kNf-uQb9k50"
+     target="_blank"
+     rel="noopener">
+    ▶ Watch full video on YouTube
+  </a>
+</div>
+
 Use this documentation to get started, explore examples, and understand how to adapt PACE to your own robot platforms.
 
 ## Documentation structure
@@ -40,6 +53,6 @@ If you use **PACE Sim2Real** in your research, please cite our [paper](https://a
   primaryClass  = {cs.RO},
 }
 ```
-<p align="center">
-  <img src="assets/tytan_pace.gif" alt="Tytan walking with a pace gait">
-</p>
+<video autoplay loop muted playsinline>
+  <source src="assets/tytan_pace_web.webm" type="video/webm">
+</video>

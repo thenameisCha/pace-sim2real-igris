@@ -34,7 +34,6 @@ theme:
 nav:
   - Home: index.md
   - Getting started:
-      - Overview: getting-started.md
       - Installation: installation.md
       - Basic usage: usage.md
   - Examples: 

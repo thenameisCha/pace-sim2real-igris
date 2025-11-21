@@ -56,7 +56,7 @@ class PaceDCMotor(DCMotor):
     def compute(
         self, control_action: ArticulationActions, joint_pos: torch.Tensor, joint_vel: torch.Tensor
     ) -> ArticulationActions:
-        # compute actuator model with encoder bias added to joint positions (joint position in encoder frame)
-        control_action_sim = super().compute(control_action, joint_pos + self.encoder_bias, joint_vel)
+        # compute actuator model with encoder bias added to joint positions (joint position in encoder frame, not simulation frame)
+        control_action_sim = super().compute(control_action, joint_pos - self.encoder_bias, joint_vel)
         control_action_sim.joint_efforts = self.torques_delay_buffer.compute(control_action_sim.joint_efforts)
         return control_action_sim

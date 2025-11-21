@@ -90,11 +90,12 @@ if plot_score:
     plt.grid()
     plt.show()
 
+print(encoder_bias)
 if plot_trajectory:
     for i in range(len(joint_order)):
         plt.figure()
-        plt.plot(trajectories[:, i].cpu().numpy(), label="Sim")
-        plt.plot(real_trajectories[:, i].cpu().numpy() + encoder_bias[i].item(), label="Real")
+        plt.plot(trajectories[:, i].cpu().numpy() - encoder_bias[i].item(), label="Sim")
+        plt.plot(real_trajectories[:, i].cpu().numpy(), label="Real")
         plt.plot(target_trajectories[:, i].cpu().numpy(), c="grey", label="Target", linestyle="--")
         plt.title(f"Joint {joint_order[i]}")  # Use joint names from config
         plt.xlabel("Time step")

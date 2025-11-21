@@ -39,7 +39,7 @@ bounds_params[:12, 1] = 1.0  # armature between 0.0 - 1.0 [kgm2]
 bounds_params[12:24, 1] = 7.0  # dof_damping between 0.0 - 7.0 [Nm s/rad]
 bounds_params[24:36, 1] = 0.5  # friction between 0.0 - 0.5
 bounds_params[36:48, 0] = -0.1
-bounds_params[36:48, 1] = 0.1  # bias between -0.5 - 0.5 [rad]
+bounds_params[36:48, 1] = 0.1  # bias between -0.1 - 0.1 [rad]
 bounds_params[48, 1] = 10.0  # delay between 0.0 - 10.0 [sim steps]
 
 
@@ -54,10 +54,10 @@ class ANYmalDPaceSceneCfg(PaceSim2realSceneCfg):
 class AnymalDPaceEnvCfg(PaceSim2realEnvCfg):
 
     scene: ANYmalDPaceSceneCfg = ANYmalDPaceSceneCfg()
-    sim2real: PaceCfg = PaceCfg(robot_name="anymal_d_sim",
+    sim2real: PaceCfg = PaceCfg(robot_name="anymal_d",
                                 joint_order=REAL_ROBOT_JOINTS,
                                 bounds_params=bounds_params,
-                                data_dir="anymal_d_sim/chirp_data.pt")  # located in pace_sim2real/data/anymal_d_sim/chirp_data.pt
+                                data_dir="anymal_d/chirp_data.pt")  # located in pace_sim2real/data/anymal_d_sim/chirp_data.pt
 
     def __post_init__(self):
         # post init of parent

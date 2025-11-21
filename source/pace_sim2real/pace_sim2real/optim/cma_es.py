@@ -42,7 +42,7 @@ class CMAESOptimizer:
 
         self.scores = torch.zeros(population_size, device=device)
         self.scores_buffer = torch.zeros((max_iteration, population_size), device=device)
-        self.sim_dof_pos_buffer = torch.zeros((population_size, data["dof_pos"].shape[0], len(joint_order)), device=device)  # TODO this is not really a nice solution
+        self.sim_dof_pos_buffer = torch.zeros((population_size, data["dof_pos"].shape[0], len(joint_order)), device=device)
 
         self.params = torch.zeros((population_size, bounds.shape[0]), device=device)
         self.sim_params = torch.zeros_like(self.params)
