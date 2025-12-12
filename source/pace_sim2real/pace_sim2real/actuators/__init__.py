@@ -17,5 +17,5 @@ which defines the common interface for all actuator models. The actuator models 
 and called by the :class:`isaaclab.assets.Articulation` class.
 """
 
-from .fourbar_pd import FourbarPDActuator, FourbarDCMotor
-from .fourbar_pd_cfg import fourbarDCMotorCfg, fourbarPDActuatorCfg, PacefourbarDCMotorCfg
+from .fourbar_pd import FourbarPDActuator, FourbarDCMotor, FourbarDCMotorReverse, PaceFourbarDCMotorReverse
+from .fourbar_pd_cfg import fourbarDCMotorCfg, fourbarPDActuatorCfg, PacefourbarDCMotorCfg, fourbarPDActuatorReverseCfg, fourbarDCMotorReverseCfg, PacefourbarDCMotorReverseCfg

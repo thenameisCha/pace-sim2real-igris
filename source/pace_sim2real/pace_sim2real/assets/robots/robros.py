@@ -15,7 +15,7 @@ from isaaclab.sensors import RayCasterCfg
 from isaaclab.utils.assets import ISAACLAB_NUCLEUS_DIR
 
 from pace_sim2real.assets import PACE_ASSETS_EXT_DIR, PACE_ASSETS_DATA_DIR
-from pace_sim2real.actuators import FourbarDCMotor
+from pace_sim2real.actuators import FourbarDCMotor, fourbarDCMotorCfg, fourbarDCMotorReverseCfg
 
 M_PI = 3.141592
 
@@ -64,7 +64,7 @@ v4_60_ACTUATOR_CFG = DCMotorCfg(
 
 IGRIS_C_WAIST_CFG = ArticulationCfg(
     spawn=sim_utils.UsdFileCfg(
-        usd_path=f"{PACE_ASSETS_DATA_DIR}/Robots/ROBROS/igris_c/igris_c_v2/igris_c_v2_waist.usd",
+        usd_path=f"{PACE_ASSETS_DATA_DIR}/Robots/ROBROS/igris_c/igris_c_v2/igris_c_v2_waist_fix.usd",
         activate_contact_sensors=True,
         rigid_props=sim_utils.RigidBodyPropertiesCfg(
             disable_gravity=False,
@@ -94,12 +94,11 @@ IGRIS_C_WAIST_CFG = ArticulationCfg(
         },
         joint_vel={".*": 0.0},
     ),
-    soft_joint_pos_limit_factor=0.95,
     actuators={
         "legs": DCMotorCfg(
             joint_names_expr=[".*Hip.*", ".*Knee.*"],
-            velocity_limit_sim=100.0,
-            effort_limit_sim={
+            velocity_limit=100.0,
+            effort_limit={
                 ".*Hip_Pitch.*": 150,
                 ".*Hip_Roll.*": 120,
                 ".*Hip_Yaw.*": 60,
@@ -137,10 +136,10 @@ IGRIS_C_WAIST_CFG = ArticulationCfg(
                 ".*Knee.*": 0.,
             },
         ),
-        "Lankle": FourbarDCMotorCfg(
-            joint_names_expr=["Left_Ankle.*"],
-            effort_limit_sim=90,
-            velocity_limit_sim=100.0,
+        "Lankle": fourbarDCMotorCfg(
+            joint_names_expr=['Joint_Ankle_Pitch_Left', 'Joint_Ankle_Roll_Left'],
+            effort_limit=90,
+            velocity_limit=100.0,
             armature=0.0307,
             friction={".*": 0.0},
             dynamic_friction={".*": 0.0},
@@ -177,10 +176,10 @@ IGRIS_C_WAIST_CFG = ArticulationCfg(
             'is_elbow_up_': False
             }
         ),
-        "Rankle": FourbarDCMotorCfg(
-            joint_names_expr=["Right_Ankle.*"],
-            effort_limit_sim=90,
-            velocity_limit_sim=100.0,
+        "Rankle": fourbarDCMotorCfg(
+            joint_names_expr=['Joint_Ankle_Pitch_Right', 'Joint_Ankle_Roll_Right'],
+            effort_limit=90,
+            velocity_limit=100.0,
             armature=0.0307,
             friction={".*": 0.0},
             dynamic_friction={".*": 0.0},
@@ -217,10 +216,10 @@ IGRIS_C_WAIST_CFG = ArticulationCfg(
             'is_elbow_up_': False
             }
         ),
-        "waist": FourbarDCMotor(
+        "waist": fourbarDCMotorReverseCfg(
             joint_names_expr=[".*Waist.*"],
-            effort_limit_sim=60,
-            velocity_limit_sim=100.0,
+            effort_limit=60,
+            velocity_limit=100.0,
             armature=0.0307,
             friction=0.,
             stiffness={".*": 70.0},  # P gain in Nm/rad

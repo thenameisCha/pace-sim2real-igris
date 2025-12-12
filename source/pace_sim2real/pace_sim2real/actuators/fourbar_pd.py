@@ -6,6 +6,7 @@ import torch
 from collections.abc import Sequence
 from typing import TYPE_CHECKING
 import torch.nn.functional as F
+from isaaclab.utils.math import quat_apply, quat_mul, quat_rotate_inverse
 
 from isaaclab.utils import DelayBuffer, LinearInterpolation
 from isaaclab.utils.types import ArticulationActions
@@ -33,7 +34,7 @@ class FourbarPDActuator(IdealPDActuator):
             raise ValueError("The fourbar constraints must be provided for the fourbar actuator model.")
         self._constraints = self.cfg.constraints
         # prepare motor level tensors
-        self._motor_pos, self._motor_vel = torch.zeros_like(self.computed_effort)
+        self._motor_pos, self._motor_vel = torch.zeros_like(self.computed_effort), torch.zeros_like(self.computed_effort)
 
     def compute(
         self, control_action: ArticulationActions, joint_pos: torch.Tensor, joint_vel: torch.Tensor
@@ -181,14 +182,14 @@ class FourbarPDActuator(IdealPDActuator):
         J_[:,0] /= d0.unsqueeze(dim=1)
         J_[:,1] /= d1.unsqueeze(dim=1)
 
-        axis1_base = F.normalize(constraints['base_to_p1_axis'], dim=-1)   # (3,)
-        axis2_local = F.normalize(constraints['p1_to_p2_axis'], dim=-1)    # (3,)
+        axis1_base = F.normalize(torch.tensor(constraints['base_to_p1_axis'], device=device), dim=-1)   # (3,)
+        axis2_local = F.normalize(torch.tensor(constraints['p1_to_p2_axis'], device=device), dim=-1)    # (3,)
         axis1_base = axis1_base.unsqueeze(0).expand(B, 3)                  # (B,3)
         axis2_local = axis2_local.unsqueeze(0).expand(B, 3)                # (B,3)
 
         # rotations we already computed earlier in IK
         rot_base_to_p1 = axis_angle_to_quat(
-            constraints['base_to_p1_axis'].unsqueeze(0).expand(B, 3),
+            torch.tensor(constraints['base_to_p1_axis'], device=device).unsqueeze(0).expand(B, 3),
             dof_pos[:, 0]
         )  # (B,4)
 
@@ -196,8 +197,8 @@ class FourbarPDActuator(IdealPDActuator):
         axis2_base = quat_apply(rot_base_to_p1, axis2_local)               # (B,3)
 
         # joint origins and p2 origin in base
-        base_to_p1_offset = constraints['base_to_p1_offset'].unsqueeze(0).expand(B, 3)
-        p1_to_p2_offset   = constraints['p1_to_p2_offset'].unsqueeze(0).expand(B, 3)
+        base_to_p1_offset = torch.tensor(constraints['base_to_p1_offset'], device=device).unsqueeze(0).expand(B, 3)
+        p1_to_p2_offset   = torch.tensor(constraints['p1_to_p2_offset'], device=device).unsqueeze(0).expand(B, 3)
 
         o1 = base_to_p1_offset                                             # (B,3)
         p2_origin = base_to_p1_offset + quat_apply(rot_base_to_p1, p1_to_p2_offset)  # (B,3)
@@ -220,6 +221,16 @@ class FourbarPDActuator(IdealPDActuator):
 
         return torch.bmm(J_, jac_joint), motor_angles_temp
     
+class FourbarPDActuatorReverse(FourbarPDActuator):
+    '''
+    Variant of the fourbar PD actuator, but swaps the joint space order
+    '''
+    def compute(self, control_action, joint_pos, joint_vel):
+        joint_pos_, joint_vel_ = joint_pos[...,[1,0]], joint_vel[..., [1,0]]
+        control_action_ = super().compute(control_action, joint_pos_, joint_vel_).clone()
+        control_action.joint_efforts = control_action_.joint_efforts[...,[1,0]]
+        return control_action
+
 class FourbarDCMotor(FourbarPDActuator):
     cfg: fourbarDCMotorCfg
 
@@ -232,7 +243,7 @@ class FourbarDCMotor(FourbarPDActuator):
         # find the velocity on the torque-speed curve that intersects effort_limit in the second and fourth quadrant
         self._vel_at_effort_lim = self.velocity_limit * (1 + self.effort_limit / self._saturation_effort)
         # prepare motor level tensors
-        self._motor_pos, self._motor_vel = torch.zeros_like(self.computed_effort)
+        self._motor_pos, self._motor_vel = torch.zeros_like(self.computed_effort), torch.zeros_like(self.computed_effort)
         # create buffer for zeros effort
         self._zeros_effort = torch.zeros_like(self.computed_effort)
         # check that quantities are provided
@@ -253,6 +264,16 @@ class FourbarDCMotor(FourbarPDActuator):
         clamped = torch.clip(effort, min=min_effort, max=max_effort)
         return clamped
     
+class FourbarDCMotorReverse(FourbarDCMotor):
+    '''
+    Variant of the fourbar DC Motor, but swaps the joint space order
+    '''
+    def compute(self, control_action, joint_pos, joint_vel):
+        joint_pos_, joint_vel_ = joint_pos[...,[1,0]], joint_vel[..., [1,0]]
+        control_action_ = super().compute(control_action, joint_pos_, joint_vel_).clone()
+        control_action.joint_efforts = control_action_.joint_efforts[...,[1,0]]
+        return control_action
+
 class PaceFourbarDCMotor(FourbarDCMotor):
     cfg: PacefourbarDCMotorCfg
 
@@ -288,6 +309,17 @@ class PaceFourbarDCMotor(FourbarDCMotor):
         # compute actuator model with encoder bias added to joint positions (joint position in encoder frame, not simulation frame)
         control_action_sim = super().compute(control_action, joint_pos - self.encoder_bias, joint_vel)
         control_action_sim.joint_efforts = self.torques_delay_buffer.compute(control_action_sim.joint_efforts)
+        return control_action_sim
+
+class PaceFourbarDCMotorReverse(PaceFourbarDCMotor):
+    '''
+    Variant of the Pace fourbar DC Motor, but swaps the joint space order
+    '''
+    def compute(self, control_action, joint_pos, joint_vel):
+        joint_pos_, joint_vel_ = joint_pos[...,[1,0]], joint_vel[..., [1,0]]
+        control_action_sim = super().compute(control_action, joint_pos_, joint_vel_)
+        je_ = control_action_sim.joint_efforts.clone()
+        control_action_sim.joint_efforts = je_[...,[1,0]]
         return control_action_sim
 
 ################HELPER#########################

@@ -7,15 +7,16 @@ from isaaclab.utils import configclass
 from pace_sim2real.assets.robots.robros import IGRIS_C_WAIST_CFG
 from isaaclab.assets import ArticulationCfg
 from pace_sim2real.utils import PaceDCMotorCfg
-from actuators import PacefourbarDCMotorCfg
+from pace_sim2real.actuators import PacefourbarDCMotorCfg, PacefourbarDCMotorReverseCfg
 from pace_sim2real import PaceSim2realEnvCfg, PaceSim2realSceneCfg, PaceCfg
 import torch
 M_PI = 3.141592
 MYACTUATOR_PACE_ACTUATOR = {
         "legs": PaceDCMotorCfg(
             joint_names_expr=[".*Hip.*", ".*Knee.*"],
-            velocity_limit_sim=8.5,
-            effort_limit_sim={
+            velocity_limit=8.5,
+            saturation_effort=250.0,
+            effort_limit={
                 ".*Hip_Pitch.*": 150,
                 ".*Hip_Roll.*": 120,
                 ".*Hip_Yaw.*": 60,
@@ -34,18 +35,19 @@ MYACTUATOR_PACE_ACTUATOR = {
                 ".*Knee.*": 1.,
             },
             encoder_bias=[0.0] * 8,  # encoder bias in radians
-            max_delay=6,  # max delay in simulation steps
+            max_delay=10,  # max delay in simulation steps
         ),
         "Lankle": PacefourbarDCMotorCfg(
-            joint_names_expr=["Left_Ankle.*"],
-            velocity_limit_sim=8.5,
-            effort_limit_sim={".*": 90},
+            joint_names_expr=['Joint_Ankle_Pitch_Left', 'Joint_Ankle_Roll_Left'],
+            velocity_limit=8.5,
+            saturation_effort=250.0,
+            effort_limit={".*": 90},
             stiffness={".*": 50.0},  # P gain in Nm/rad
             damping={
                 ".*": 3.,
             },
-            encoder_bias=[0.0] * 8,  # encoder bias in radians
-            max_delay=6,  # max delay in simulation steps
+            encoder_bias=[0.0] * 2,  # encoder bias in radians
+            max_delay=10,  # max delay in simulation steps
             constraints={
             'r_a_init_': [
                 [0.0, 0.03775, 0.26],
@@ -74,16 +76,16 @@ MYACTUATOR_PACE_ACTUATOR = {
             }
         ),
         "Rankle": PacefourbarDCMotorCfg(
-            joint_names_expr=["Right_Ankle.*"],
-            effort_limit_sim=90,
-            velocity_limit_sim=8.5,
-            effort_limit_sim={".*": 90},
+            joint_names_expr=['Joint_Ankle_Pitch_Right', 'Joint_Ankle_Roll_Right'],
+            velocity_limit=8.5,
+            saturation_effort=250.0,
+            effort_limit={".*": 90},
             stiffness={".*": 50.0},  # P gain in Nm/rad
             damping={
                 ".*": 3.,
             },
-            encoder_bias=[0.0] * 8,  # encoder bias in radians
-            max_delay=6,  # max delay in simulation steps
+            encoder_bias=[0.0] * 2,  # encoder bias in radians
+            max_delay=10,  # max delay in simulation steps
             constraints={
             'r_a_init_': [
                 [0.0, -0.03775, 0.26],
@@ -111,17 +113,18 @@ MYACTUATOR_PACE_ACTUATOR = {
             'is_elbow_up_': False
             }
         ),
-        "waist": PacefourbarDCMotorCfg(
+        "waist": PacefourbarDCMotorReverseCfg(
             joint_names_expr=[".*Waist.*"],
-            effort_limit_sim=60,
-            velocity_limit_sim=100.0,
+            effort_limit=60,
+            velocity_limit=100.0,
+            saturation_effort=250.0,
             stiffness={".*": 70.0},  # P gain in Nm/rad
             damping={
                 '.*Roll.*': 1.8,
                 '.*Pitch.*': 1.8,
             },
-            encoder_bias=[0.0] * 8,  # encoder bias in radians
-            max_delay=6,  # max delay in simulation steps
+            encoder_bias=[0.0] * 2,  # encoder bias in radians
+            max_delay=10,  # max delay in simulation steps
             constraints={
             'r_a_init_': [
                 [0.0, 0.0905, -0.04],
@@ -149,31 +152,29 @@ MYACTUATOR_PACE_ACTUATOR = {
             'is_elbow_up_': True
             }
         ),
-    },
-
-
+    }
 
 @configclass
 class IgrisCPaceCfg(PaceCfg):
     """Pace configuration for Igris-C robot."""
     robot_name: str = "igris_c_sim"
     data_dir: str = "igris_c_sim/chirp_data.pt"  # located in pace_sim2real/data/igris_c_sim/chirp_data.pt
-    bounds_params: torch.Tensor = torch.zeros((49, 2))  # 14 + 14 + 14 + 14 + 1 = 49 parameters to optimize
+    bounds_params: torch.Tensor = torch.zeros((57, 2))  # 14 + 14 + 14 + 14 + 1 = 57 parameters to optimize
     joint_order: list[str] = [
-        "Waist_Roll",
-        "Waist_Pitch",
-        "Left_Hip_Pitch",
-        "Left_Hip_Roll",
-        "Left_Hip_Yaw",
-        "Left_Knee_Pitch",
-        "Left_Ankle_Pitch",
-        "Left_Ankle_Roll",
-        "Right_Hip_Pitch",
-        "Right_Hip_Roll",
-        "Right_Hip_Yaw",
-        "Right_Knee_Pitch",
-        "Right_Ankle_Pitch",
-        "Right_Ankle_Roll",
+        'Joint_Waist_Roll', 
+        'Joint_Waist_Pitch', 
+        'Joint_Hip_Pitch_Left', 
+        'Joint_Hip_Roll_Left', 
+        'Joint_Hip_Yaw_Left', 
+        'Joint_Knee_Pitch_Left', 
+        'Joint_Ankle_Pitch_Left', 
+        'Joint_Ankle_Roll_Left', 
+        'Joint_Hip_Pitch_Right', 
+        'Joint_Hip_Roll_Right', 
+        'Joint_Hip_Yaw_Right', 
+        'Joint_Knee_Pitch_Right', 
+        'Joint_Ankle_Pitch_Right', 
+        'Joint_Ankle_Roll_Right'
     ]
 
     def __post_init__(self):
@@ -183,14 +184,14 @@ class IgrisCPaceCfg(PaceCfg):
         self.bounds_params[14:28, 1] = 15.0  # dof_damping between 0.0 - 7.0 [Nm s/rad]
         self.bounds_params[28:42, 1] = 2.  # friction between 0.0 - 0.5
         self.bounds_params[42:56, 0] = -0.1
-        self.bounds_params[56:70, 1] = 0.2  # bias between -0.1 - 0.1 [rad]
-        self.bounds_params[70, 1] = 10.0  # delay between 0.0 - 10.0 [sim steps]
+        self.bounds_params[42:56, 1] = 0.2  # bias between -0.1 - 0.1 [rad]
+        self.bounds_params[56, 1] = 10.0  # delay between 0.0 - 10.0 [sim steps]
 
 
 @configclass
 class IgrisCPaceSceneCfg(PaceSim2realSceneCfg):
-    """Configuration for Anymal-D robot in Pace Sim2Real environment."""
-    robot: ArticulationCfg = IGRIS_C_WAIST_CFG.replace(prim_path="{ENV_REGEX_NS}/Robot", init_state=ArticulationCfg.InitialStateCfg(pos=(0.0, 0.0, 1.0)),
+    """Configuration for IGRIS-C robot in Pace Sim2Real environment."""
+    robot: ArticulationCfg = IGRIS_C_WAIST_CFG.replace(prim_path="{ENV_REGEX_NS}/Robot", init_state=ArticulationCfg.InitialStateCfg(pos=(0.0, 0.0, 1.5)),
                                                   actuators=MYACTUATOR_PACE_ACTUATOR)
 
 
