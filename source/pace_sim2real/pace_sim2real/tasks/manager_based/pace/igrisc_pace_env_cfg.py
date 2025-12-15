@@ -10,37 +10,48 @@ from pace_sim2real.utils import PaceDCMotorCfg
 from pace_sim2real.actuators import PacefourbarDCMotorCfg, PacefourbarDCMotorReverseCfg
 from pace_sim2real import PaceSim2realEnvCfg, PaceSim2realSceneCfg, PaceCfg
 import torch
-M_PI = 3.141592
+
 MYACTUATOR_PACE_ACTUATOR = {
-        "legs": PaceDCMotorCfg(
-            joint_names_expr=[".*Hip.*", ".*Knee.*"],
-            velocity_limit=8.5,
-            saturation_effort=250.0,
-            effort_limit={
-                ".*Hip_Pitch.*": 150,
-                ".*Hip_Roll.*": 120,
-                ".*Hip_Yaw.*": 60,
-                ".*Knee.*": 150,
-            },
+        "X12-150": PaceDCMotorCfg(
+            joint_names_expr=[".*Hip_Pitch.*", ".*Knee.*"],
+            velocity_limit=10.,
+            saturation_effort=150.,
+            effort_limit=150.,
             stiffness={
                 ".*Hip_Pitch.*": 150.,
-                ".*Hip_Roll.*": 150.,
-                ".*Hip_Yaw.*": 100.,
                 ".*Knee.*": 150.,
             }, 
             damping={
                 ".*Hip_Pitch.*": 2.,
-                ".*Hip_Roll.*": 3.,
-                ".*Hip_Yaw.*": 1.5,
                 ".*Knee.*": 1.,
             },
-            encoder_bias=[0.0] * 8,  # encoder bias in radians
+            encoder_bias=[0.0] * 4,  # encoder bias in radians
+            max_delay=10,  # max delay in simulation steps
+        ),
+        "X8-120": PaceDCMotorCfg(
+            joint_names_expr=[".*Hip_Roll.*"],
+            velocity_limit=16.54,
+            saturation_effort=120.,
+            effort_limit=120.,
+            stiffness=150.,
+            damping=3.,
+            encoder_bias=[0.0] * 2,  # encoder bias in radians
+            max_delay=10,  # max delay in simulation steps
+        ),
+        "X8-60": PaceDCMotorCfg(
+            joint_names_expr=[".*Hip_Yaw.*"],
+            velocity_limit=16.0,
+            saturation_effort=60.,
+            effort_limit=60.,
+            stiffness=100.,
+            damping=1.5,
+            encoder_bias=[0.0] * 2,  # encoder bias in radians
             max_delay=10,  # max delay in simulation steps
         ),
         "Lankle": PacefourbarDCMotorCfg(
             joint_names_expr=['Joint_Ankle_Pitch_Left', 'Joint_Ankle_Roll_Left'],
-            velocity_limit=8.5,
-            saturation_effort=250.0,
+            velocity_limit=13.61,
+            saturation_effort=90,
             effort_limit={".*": 90},
             stiffness={".*": 50.0},  # P gain in Nm/rad
             damping={
@@ -70,15 +81,15 @@ MYACTUATOR_PACE_ACTUATOR = {
             'base_to_p1_axis': [0.0, 1.0, 0.0],
             'p1_to_p2_offset': [0.0, 0.0, -0.0],
             'p1_to_p2_axis': [1.0, 0.0, 0.0],
-            'motor_angles_min_': [-36.1 *M_PI/180, -35.4 *M_PI/180],
-            'motor_angles_max_': [34.9 *M_PI/180, 30 *M_PI/180],
+            'motor_angles_min_': [-36.1 *torch.pi/180, -35.4 *torch.pi/180],
+            'motor_angles_max_': [34.9 *torch.pi/180, 30 *torch.pi/180],
             'is_elbow_up_': False
             }
         ),
         "Rankle": PacefourbarDCMotorCfg(
             joint_names_expr=['Joint_Ankle_Pitch_Right', 'Joint_Ankle_Roll_Right'],
-            velocity_limit=8.5,
-            saturation_effort=250.0,
+            velocity_limit=13.61,
+            saturation_effort=90,
             effort_limit={".*": 90},
             stiffness={".*": 50.0},  # P gain in Nm/rad
             damping={
@@ -108,16 +119,16 @@ MYACTUATOR_PACE_ACTUATOR = {
             'base_to_p1_axis': [0.0, 1.0, 0.0],
             'p1_to_p2_offset': [0.0, 0.0, -0.0],
             'p1_to_p2_axis': [1.0, 0.0, 0.0],
-            'motor_angles_min_': [-36.1 *M_PI/180, -35.4 *M_PI/180],
-            'motor_angles_max_': [34.9 *M_PI/180, 30 *M_PI/180],
+            'motor_angles_min_': [-36.1 *torch.pi/180, -35.4 *torch.pi/180],
+            'motor_angles_max_': [34.9 *torch.pi/180, 30 *torch.pi/180],
             'is_elbow_up_': False
             }
         ),
         "waist": PacefourbarDCMotorReverseCfg(
             joint_names_expr=[".*Waist.*"],
+            velocity_limit=16.0,
             effort_limit=60,
-            velocity_limit=100.0,
-            saturation_effort=250.0,
+            saturation_effort=60.0,
             stiffness={".*": 70.0},  # P gain in Nm/rad
             damping={
                 '.*Roll.*': 1.8,
@@ -181,11 +192,12 @@ class IgrisCPaceCfg(PaceCfg):
         # set bounds for parameters
         self.bounds_params[:14, 0] = 1e-5
         self.bounds_params[:14, 1] = 5.0  # armature between 1e-5 - 1.0 [kgm2]
-        self.bounds_params[14:28, 1] = 15.0  # dof_damping between 0.0 - 7.0 [Nm s/rad]
-        self.bounds_params[28:42, 1] = 2.  # friction between 0.0 - 0.5
+        self.bounds_params[14:28, 1] = 30.0  # dof_damping between 0.0 - 7.0 [Nm s/rad]
+        self.bounds_params[28:42, 1] = 5.  # friction between 0.0 - 0.5
         self.bounds_params[42:56, 0] = -0.1
-        self.bounds_params[42:56, 1] = 0.2  # bias between -0.1 - 0.1 [rad]
-        self.bounds_params[56, 1] = 10.0  # delay between 0.0 - 10.0 [sim steps]
+        self.bounds_params[42:56, 1] = 0.1  # bias between -0.1 - 0.1 [rad]
+        self.bounds_params[56, 0] = 1.0  # delay between 0.0 - 10.0 [sim steps]
+        self.bounds_params[56, 1] = 5.0  # delay between 0.0 - 10.0 [sim steps]
 
 
 @configclass

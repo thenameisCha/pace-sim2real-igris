@@ -33,13 +33,72 @@ class FourbarPDActuator(IdealPDActuator):
         if self.cfg.constraints is None:
             raise ValueError("The fourbar constraints must be provided for the fourbar actuator model.")
         self._constraints = self.cfg.constraints
+        self._init_constraint_tensors()
         # prepare motor level tensors
         self._motor_pos, self._motor_vel = torch.zeros_like(self.computed_effort), torch.zeros_like(self.computed_effort)
-
+    
+    def _init_constraint_tensors(self):
+        """Create tensors from the static constraint values once."""
+        device = self.computed_effort.device
+        dtype = self.computed_effort.dtype
+        constraints = self._constraints
+ 
+        self._r_a_init = torch.tensor(constraints["r_a_init_"], device=device, dtype=dtype)
+        self._r_b_init = torch.tensor(constraints["r_b_init_"], device=device, dtype=dtype)
+        self._r_c_init = torch.tensor(constraints["r_c_init_"], device=device, dtype=dtype)
+        self._r_c_offset_local = torch.tensor(constraints["r_c_offset_local_"], device=device, dtype=dtype)
+        self._base_to_p1_offset = torch.tensor(constraints["base_to_p1_offset"], device=device, dtype=dtype)
+        self._base_to_p1_axis = torch.tensor(constraints["base_to_p1_axis"], device=device, dtype=dtype)
+        self._p1_to_p2_offset = torch.tensor(constraints["p1_to_p2_offset"], device=device, dtype=dtype)
+        self._p1_to_p2_axis = torch.tensor(constraints["p1_to_p2_axis"], device=device, dtype=dtype)
+        self._is_elbow_up = constraints["is_elbow_up_"]
+        self._motor_limit_l = torch.tensor(constraints.get("motor_angles_min_", [-1.57, -1.57]), device=device, dtype=dtype)
+        self._motor_limit_h = torch.tensor(constraints.get("motor_angles_max_", [1.57, 1.57]), device=device, dtype=dtype)
+        self._y_axis = torch.tensor([0.0, 1.0, 0.0], device=device, dtype=dtype)
+ 
+        # Pre-compute constant intermediate tensors to avoid per-step allocations
+        self._r_b_offset_local = self._r_b_init - self._r_a_init
+        self._l_bar = torch.norm(self._r_b_init - self._r_a_init, dim=-1)
+        self._l_rod = torch.norm(self._r_c_init - self._r_b_init, dim=-1)
+        self._axis1_base = F.normalize(self._base_to_p1_axis, dim=-1)
+        self._axis2_local = F.normalize(self._p1_to_p2_axis, dim=-1)
+ 
+        self._constraint_tensor_names = [
+            "_r_a_init",
+            "_r_b_init",
+            "_r_c_init",
+            "_r_c_offset_local",
+            "_base_to_p1_offset",
+            "_base_to_p1_axis",
+            "_p1_to_p2_offset",
+            "_p1_to_p2_axis",
+            "_motor_limit_l",
+            "_motor_limit_h",
+            "_y_axis",
+            "_r_b_offset_local",
+            "_l_bar",
+            "_l_rod",
+            "_axis1_base",
+            "_axis2_local",
+        ]
+        self._constraint_device = device
+        self._constraint_dtype = dtype
+ 
+    def _ensure_constraint_tensors(self, device: torch.device, dtype: torch.dtype):
+        """Move cached constraint tensors if compute is called on a new device/dtype."""
+        if device == self._constraint_device and dtype == self._constraint_dtype:
+            return
+        for name in self._constraint_tensor_names:
+            tensor = getattr(self, name)
+            setattr(self, name, tensor.to(device=device, dtype=dtype))
+        self._constraint_device = device
+        self._constraint_dtype = dtype
+ 
     def compute(
         self, control_action: ArticulationActions, joint_pos: torch.Tensor, joint_vel: torch.Tensor
     ) -> ArticulationActions:
         # calculate current motor-joint jacobian and motor positions with IK
+
         _motor_jac, self._motor_pos = self._fourbar_logic(joint_pos, self._constraints)
         # Jacobian mapping to calculate motor velocities
         self._motor_vel = torch.bmm(_motor_jac, joint_vel.unsqueeze(dim=-1)).squeeze(dim=-1)
@@ -66,27 +125,29 @@ class FourbarPDActuator(IdealPDActuator):
     def _fourbar_logic(self, dof_pos_clipped, constraints):
         # IK computation, dof_pos -> motor_pos
         device = dof_pos_clipped.device
+        dtype = dof_pos_clipped.dtype
+        self._ensure_constraint_tensors(device, dtype)
         dof_pos = dof_pos_clipped.clone()
         B = dof_pos.shape[0]
-        r_c_ = torch.zeros((B, 2, 3), device=device) # [B,2,3]        
-        r_a_init_ = torch.tensor(constraints['r_a_init_'], device=device).unsqueeze(dim=0).repeat(B,1,1)  # [B,2,3]
-        r_b_init_ = torch.tensor(constraints['r_b_init_'], device=device).unsqueeze(dim=0).repeat(B,1,1)  # [B,2,3]
-        r_c_init_ = torch.tensor(constraints['r_c_init_'], device=device).unsqueeze(dim=0).repeat(B,1,1)  # [B,2,3]
-        r_c_offset_local_ = torch.tensor(constraints['r_c_offset_local_'], device=device).unsqueeze(dim=0).repeat(B,1,1)   # [B,2,3]
-        base_to_p1_offset = torch.tensor(constraints['base_to_p1_offset'], device=device).unsqueeze(dim=0).repeat(B,1)  # [B,3]
-        base_to_p1_axis = torch.tensor(constraints['base_to_p1_axis'], device=device).unsqueeze(dim=0).repeat(B,1)    # [B,3]
-        p1_to_p2_offset = torch.tensor(constraints['p1_to_p2_offset'], device=device).unsqueeze(dim=0).repeat(B,1)    # [B,3]
-        p1_to_p2_axis = torch.tensor(constraints['p1_to_p2_axis'], device=device).unsqueeze(dim=0).repeat(B,1)      # [B,3]
-        is_elbow_up = constraints['is_elbow_up_'] # bool
-        motor_limit_l_ = torch.tensor(constraints.get('motor_angles_min_', [-1.57, -1.57]), device=device).unsqueeze(dim=0).repeat(B,1)  
-        motor_limit_h_ = torch.tensor(constraints.get('motor_angles_max_', [1.57, 1.57]), device=device).unsqueeze(dim=0).repeat(B,1)  
-        motor_angles_temp = torch.zeros((B,2), device=device)
-
-        l_bar_ = torch.norm(r_b_init_ - r_a_init_, dim=-1) # [B,2]
-        l_rod_ = torch.norm(r_c_init_ - r_b_init_, dim=-1)  # [B,2]
-        r_b_offset_local_ = r_b_init_ - r_a_init_  # [B,2,3]
+ 
+        r_a_init_ = self._r_a_init.expand(B, -1, -1)  # [B,2,3]
+        r_b_init_ = self._r_b_init.expand(B, -1, -1)  # [B,2,3]
+        r_c_init_ = self._r_c_init.expand(B, -1, -1)  # [B,2,3]
+        r_c_offset_local_ = self._r_c_offset_local.expand(B, -1, -1)  # [B,2,3]
+        base_to_p1_offset = self._base_to_p1_offset.expand(B, -1)  # [B,3]
+        base_to_p1_axis = self._base_to_p1_axis.expand(B, -1)  # [B,3]
+        p1_to_p2_offset = self._p1_to_p2_offset.expand(B, -1)  # [B,3]
+        p1_to_p2_axis = self._p1_to_p2_axis.expand(B, -1)  # [B,3]
+        is_elbow_up = self._is_elbow_up  # bool
+        motor_limit_l_ = self._motor_limit_l.expand(B, -1)
+        motor_limit_h_ = self._motor_limit_h.expand(B, -1)
+        motor_angles_temp = torch.zeros((B,2), device=device, dtype=dtype)
+ 
+        l_bar_ = self._l_bar.expand(B, -1)  # [B,2]
+        l_rod_ = self._l_rod.expand(B, -1)  # [B,2]
+        r_b_offset_local_ = self._r_b_offset_local.expand(B, -1, -1)  # [B,2,3]
         b_vec_ = r_b_init_ - r_a_init_  # [B,2,3]
-
+ 
         rot_base_to_p1 = axis_angle_to_quat(base_to_p1_axis, dof_pos[:, 0])  # [B,4]
         rot_p1_to_p2 = axis_angle_to_quat(p1_to_p2_axis, dof_pos[:, 1])  # [B,4]
         base_to_p1_offset_expanded = base_to_p1_offset.unsqueeze(1).repeat(1,2,1)  # [B,2,3]
@@ -111,9 +172,8 @@ class FourbarPDActuator(IdealPDActuator):
             (B_ - torch.sqrt(torch.clamp(B_ * B_ - A * C, min=0.0))) / A, -1.0, 1.0)
         
         motor_angle_pos = torch.asin(value_pos_sign)  # [B,2]
-        motor_angle_neg = torch.asin(value_neg_sign)  # [B,2]   
-        motor_angle_candidates = torch.zeros((6,B,2), device=device)  # [6,B,2], initialized to large negative value meaning invalid
-
+        motor_angle_neg = torch.asin(value_neg_sign)  # [B,2]
+        motor_angle_candidates = torch.zeros((6,B,2), device=device, dtype=dtype)  # [6,B,2], initialized to large negative value meaning invalid
         env_1 = (motor_angle_pos >= motor_limit_l_) &\
             (motor_angle_pos <= motor_limit_h_) # [B,2]
         env_2 = (motor_angle_neg >= motor_limit_l_) &\
@@ -127,16 +187,16 @@ class FourbarPDActuator(IdealPDActuator):
         env_6 = (-torch.pi - motor_angle_neg >= motor_limit_l_) &\
             (-torch.pi - motor_angle_neg <= motor_limit_h_)
         env_masks = [env_1, env_2, env_3, env_4, env_5, env_6] # list of [B,2] masks
-        motor_angle_candidates[0][env_1] = motor_angle_pos[env_1] 
+        motor_angle_candidates[0][env_1] = motor_angle_pos[env_1]
         motor_angle_candidates[1][env_2] = motor_angle_neg[env_2]
         motor_angle_candidates[2][env_3] = torch.pi - motor_angle_pos[env_3]
         motor_angle_candidates[3][env_4] = torch.pi - motor_angle_neg[env_4]
         motor_angle_candidates[4][env_5] = -torch.pi - motor_angle_pos[env_5]
         motor_angle_candidates[5][env_6] = -torch.pi - motor_angle_neg[env_6]
-
+ 
         r_a_init_expanded = r_a_init_ # [B,2,3]
         r_b_offset_local_expanded = r_b_offset_local_  # [B,2,3]
-        y_axis = torch.tensor([0.,1.,0.], device=device).unsqueeze(0)
+        y_axis = self._y_axis
         for j in range(6):
             env_mask = env_masks[j] # [B,2]
             q_motor_flattened = motor_angle_candidates[j, env_mask] # [2N]
@@ -144,16 +204,14 @@ class FourbarPDActuator(IdealPDActuator):
             r_b_offset_local_flattened = r_b_offset_local_expanded[env_mask] # [2N,3]
             r_c_flattened = r_c_[env_mask]  # [2N,3]
             r_b_ = r_a_init_flattened + quat_apply(axis_angle_to_quat(y_axis, q_motor_flattened), r_b_offset_local_flattened)  # [2N,3])
-
             bar = r_b_ - r_a_init_flattened  # [2N,3]
             rod = r_c_flattened - r_b_  # [2N,3]
             l_rod_condition = torch.abs(rod.norm(dim=-1) - l_rod_[env_mask]) < 1e-4  # [2N]
             elbow_direction = torch.cross(bar, rod, dim=1)[:, 1] > 0 # [2N]
             elbow_direction_condition = (elbow_direction == is_elbow_up) # [2N]
-
+ 
             valid_condition = l_rod_condition & elbow_direction_condition  # [2N]
             motor_angles_temp[env_mask] = q_motor_flattened * valid_condition.float() + motor_angles_temp[env_mask] * (~valid_condition).float()
-
         motor_angles_temp = torch.clip(motor_angles_temp, motor_limit_l_, motor_limit_h_)
         
         # Jacobian computation, \dot{m} = J\dot{q}
@@ -167,13 +225,13 @@ class FourbarPDActuator(IdealPDActuator):
         cross_bar_rod = torch.cross(r_bar_, r_rod_, dim=-1)   # (B,2,3)
         J_theta[:, 0, 0] = cross_bar_rod[:, 0, 1]
         J_theta[:, 1, 1] = cross_bar_rod[:, 1, 1]
-
+ 
         d0 = J_theta[:, 0, 0].clone()
         d1 = J_theta[:, 1, 1].clone()
         eps = 1e-8
         mask0 = torch.abs(d0) < eps
         mask1 = torch.abs(d1) < eps
-
+ 
         d0[mask0] = torch.where(d0[mask0] >= 0, torch.full_like(d0[mask0], eps),
                                                 torch.full_like(d0[mask0], -eps))
         d1[mask1] = torch.where(d1[mask1] >= 0, torch.full_like(d1[mask1], eps),
@@ -181,44 +239,42 @@ class FourbarPDActuator(IdealPDActuator):
         J_=J_x.clone()
         J_[:,0] /= d0.unsqueeze(dim=1)
         J_[:,1] /= d1.unsqueeze(dim=1)
-
-        axis1_base = F.normalize(torch.tensor(constraints['base_to_p1_axis'], device=device), dim=-1)   # (3,)
-        axis2_local = F.normalize(torch.tensor(constraints['p1_to_p2_axis'], device=device), dim=-1)    # (3,)
-        axis1_base = axis1_base.unsqueeze(0).expand(B, 3)                  # (B,3)
-        axis2_local = axis2_local.unsqueeze(0).expand(B, 3)                # (B,3)
-
+ 
+        axis1_base = self._axis1_base.expand(B, 3)                  # (B,3)
+        axis2_local = self._axis2_local.expand(B, 3)                # (B,3)
+ 
         # rotations we already computed earlier in IK
         rot_base_to_p1 = axis_angle_to_quat(
-            torch.tensor(constraints['base_to_p1_axis'], device=device).unsqueeze(0).expand(B, 3),
+            self._base_to_p1_axis.expand(B, 3),
             dof_pos[:, 0]
         )  # (B,4)
-
+ 
         # joint 2 axis in base frame
         axis2_base = quat_apply(rot_base_to_p1, axis2_local)               # (B,3)
-
+ 
         # joint origins and p2 origin in base
-        base_to_p1_offset = torch.tensor(constraints['base_to_p1_offset'], device=device).unsqueeze(0).expand(B, 3)
-        p1_to_p2_offset   = torch.tensor(constraints['p1_to_p2_offset'], device=device).unsqueeze(0).expand(B, 3)
-
+        base_to_p1_offset = self._base_to_p1_offset.expand(B, 3)
+        p1_to_p2_offset   = self._p1_to_p2_offset.expand(B, 3)
+ 
         o1 = base_to_p1_offset                                             # (B,3)
         p2_origin = base_to_p1_offset + quat_apply(rot_base_to_p1, p1_to_p2_offset)  # (B,3)
         o2 = p2_origin                                                     # joint 2 axis through p2 origin
-
+ 
         # angular part
         Jw1 = axis1_base                                                  # (B,3)
         Jw2 = axis2_base                                                  # (B,3)
-
+ 
         # linear part: Jv1 = ω1 × (p2 - o1), Jv2 = ω2 × (p2 - o2) = 0
         Jv1 = torch.cross(Jw1, (p2_origin - o1), dim=-1)                  # (B,3)
         Jv2 = torch.zeros_like(Jv1)                                       # (B,3)
-
+ 
         # Build jac_joint with [linear; angular] order, already swapped like in C++
         jac_joint = torch.zeros(B, 6, 2, device=device, dtype=torch.float32)
         jac_joint[:, 0:3, 0] = Jv1
         jac_joint[:, 3:6, 0] = Jw1
         jac_joint[:, 0:3, 1] = Jv2
         jac_joint[:, 3:6, 1] = Jw2
-
+ 
         return torch.bmm(J_, jac_joint), motor_angles_temp
     
 class FourbarPDActuatorReverse(FourbarPDActuator):
@@ -334,23 +390,42 @@ def axis_angle_to_quat(axis_vecs: torch.Tensor, angles: torch.Tensor) -> torch.T
     """
     if axis_vecs.shape[-1] != 3:
         raise ValueError(f"axis_vecs must end with dim 3, got {axis_vecs.shape}")
-
+ 
     # Move angles onto the same device/dtype
     angles = angles.to(device=axis_vecs.device, dtype=axis_vecs.dtype)
-
+ 
     # Determine broadcasted batch shape
     batch_shape = torch.broadcast_shapes(axis_vecs.shape[:-1], angles.shape)
-
+ 
     # Broadcast tensors
     axis = axis_vecs.expand(*batch_shape, 3)
     ang = angles.expand(*batch_shape)
-
+ 
     axis = F.normalize(axis, dim=-1)
     half = 0.5 * ang
     sin_half = torch.sin(half)
     cos_half = torch.cos(half)
-
+ 
     quat = torch.empty(*batch_shape, 4, dtype=axis.dtype, device=axis.device)
     quat[..., :3] = axis * sin_half.unsqueeze(-1)
     quat[..., 3] = cos_half
     return quat
+ 
+def quat_apply(quat: torch.Tensor, vec: torch.Tensor) -> torch.Tensor:
+    qvec = quat[..., :3]
+    uv = torch.cross(qvec, vec, dim=-1)
+    uuv = torch.cross(qvec, uv, dim=-1)
+    return vec + 2 * (quat[..., 3:4] * uv + uuv)
+ 
+ 
+def quat_mul(q: torch.Tensor, r: torch.Tensor) -> torch.Tensor:
+    return torch.stack(
+        (
+            r[..., 3] * q[..., 0] + r[..., 0] * q[..., 3] + r[..., 1] * q[..., 2] - r[..., 2] * q[..., 1],
+            r[..., 3] * q[..., 1] - r[..., 0] * q[..., 2] + r[..., 1] * q[..., 3] + r[..., 2] * q[..., 0],
+            r[..., 3] * q[..., 2] + r[..., 0] * q[..., 1] - r[..., 1] * q[..., 0] + r[..., 2] * q[..., 3],
+            r[..., 3] * q[..., 3] - r[..., 0] * q[..., 0] - r[..., 1] * q[..., 1] - r[..., 2] * q[..., 2],
+        ),
+        dim=-1,
+    )
+ 

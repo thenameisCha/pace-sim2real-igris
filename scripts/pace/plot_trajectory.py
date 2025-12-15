@@ -13,8 +13,8 @@ import argparse
 parser = argparse.ArgumentParser(description="Pace agent for Isaac Lab environments.")
 parser.add_argument("--folder_name", type=str, default=None, help="Name of the folder to use.")
 parser.add_argument("--mean_name", type=str, default=None, help="Name of the parameters file to use.")
-parser.add_argument("--robot_name", type=str, default="anymal_d_sim", help="Name of the robot.")
-parser.add_argument("--plot_trajectory", action="store_true", help="Whether to plot the trajectory.")
+parser.add_argument("--robot_name", type=str, default="igris_c_sim", help="Name of the robot.")
+parser.add_argument("--plot_trajectory", action="store_true", default=True, help="Whether to plot the trajectory.")
 parser.add_argument("--plot_score", action="store_true", help="Whether to plot the score over iterations.")
 
 args = parser.parse_args()
@@ -79,6 +79,8 @@ trajectories = torch.load(log_dir / "best_trajectory.pt")  # time x joints
 real_trajectories = config["dof_pos"]  # time x joints
 target_trajectories = config["des_dof_pos"]  # time x joints
 time = config["time"]  # time
+# ensure CPU numpy arrays for plotting
+time_np = time.cpu().numpy() if hasattr(time, "cpu") else time
 
 print(f"Best parameter set: {mean}")
 print(f"Armature params: {mean[:len(joint_order)]}")
@@ -112,15 +114,16 @@ if plot_score:
 if plot_trajectory:
     for i in range(len(joint_order)):
         plt.figure(figsize=(8, 4.5))
-        plt.plot(time, trajectories[:, i].cpu().numpy() - encoder_bias[i].item(), c="tab:orange", label="Sim", linewidth=2)  # in encoder frame
-        plt.plot(time, real_trajectories[:, i].cpu().numpy(), label="Real", c="tab:green", linestyle="--", linewidth=2)
-        plt.plot(time, target_trajectories[:, i].cpu().numpy(), c="grey", label="Target", linestyle="--", alpha=0.5)
+        plt.plot(time_np, trajectories[:, i].cpu().numpy() - encoder_bias[i].item(), c="tab:orange", label="Sim", linewidth=2)  # in encoder frame
+        plt.plot(time_np, real_trajectories[:, i].cpu().numpy(), label="Real", c="tab:green", linestyle="--", linewidth=2)
+        plt.plot(time_np, target_trajectories[:, i].cpu().numpy(), c="grey", label="Target", linestyle="--", alpha=0.5)
         plt.title(f"Joint {joint_order[i]}")  # Use joint names from config
         plt.xlabel("Time [s]")
         plt.ylabel("Joint position [rad]")
         plt.legend()
         plt.grid()
         plt.tight_layout()
-        plt.show()
+        # plt.show()
+        plt.savefig(f'/home/robros/lab_ws/pace-sim2real-igris/scripts/pace//best_trajectory_{joint_order[i]}.png')
 
 print("Plotting complete.")
