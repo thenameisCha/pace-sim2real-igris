@@ -33,6 +33,13 @@ class FourbarPDActuator(IdealPDActuator):
         if self.cfg.constraints is None:
             raise ValueError("The fourbar constraints must be provided for the fourbar actuator model.")
         self._constraints = self.cfg.constraints
+        if isinstance(cfg.motor_constant, (list, tuple)):
+            if len(cfg.motor_constant) != self.num_joints:
+                raise ValueError(
+                    f"motor_constant must have {self.num_joints} elements (one per joint), "
+                    f"but got {len(cfg.motor_constant)}: {cfg.motor_constant}"
+                )
+        self.motor_constant = torch.tensor(cfg.motor_constant, device=self._device).unsqueeze(0).repeat(self._num_envs, 1)
         self._init_constraint_tensors()
         # prepare motor level tensors
         self._motor_pos, self._motor_vel = torch.zeros_like(self.computed_effort), torch.zeros_like(self.computed_effort)
@@ -113,7 +120,7 @@ class FourbarPDActuator(IdealPDActuator):
         # calculate the desired motor torques
         self.computed_effort = self.stiffness * error_pos + self.damping * error_vel + motor_efforts
         # clip the torques based on the motor limits
-        motor_effort = self._clip_effort(self.computed_effort)
+        motor_effort = self._clip_effort(self.computed_effort) * torch.exp(self.motor_constant)
         # Map motor level effort back to joint level
         self.applied_effort = torch.bmm(_motor_jac.transpose(1,2), motor_effort.unsqueeze(dim=-1)).squeeze(dim=-1)
         # set the computed actions back into the control action
@@ -342,7 +349,14 @@ class PaceFourbarDCMotor(FourbarDCMotor):
                     f"but got {len(cfg.encoder_bias)}: {cfg.encoder_bias}"
                 )
         self.encoder_bias = torch.tensor(cfg.encoder_bias, device=self._device).unsqueeze(0).repeat(self._num_envs, 1)
-
+        if isinstance(cfg.motor_constant, (list, tuple)):
+            if len(cfg.motor_constant) != self.num_joints:
+                raise ValueError(
+                    f"motor_constant must have {self.num_joints} elements (one per joint), "
+                    f"but got {len(cfg.motor_constant)}: {cfg.motor_constant}"
+                )
+        self.motor_constant = torch.tensor(cfg.motor_constant, device=self._device).unsqueeze(0).repeat(self._num_envs, 1)
+        # create delay buffer for torques
         self.torques_delay_buffer = DelayBuffer(cfg.max_delay + 1, self._num_envs, device=self._device)
         self.torques_delay_buffer.set_time_lag(cfg.max_delay, torch.arange(self._num_envs, device=self._device))
 
@@ -353,6 +367,9 @@ class PaceFourbarDCMotor(FourbarDCMotor):
 
     def update_encoder_bias(self, encoder_bias: torch.Tensor):
         self.encoder_bias = encoder_bias
+
+    def update_motor_constant(self, motor_constant: torch.Tensor):
+        self.motor_constant = motor_constant
 
     def update_time_lags(self, delay: int | torch.Tensor, env_ids: Sequence[int] | None = None):
         if env_ids is None:

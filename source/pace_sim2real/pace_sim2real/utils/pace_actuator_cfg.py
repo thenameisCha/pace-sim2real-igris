@@ -20,3 +20,4 @@ class PaceDCMotorCfg(DCMotorCfg):
     class_type: type = pace_actuator.PaceDCMotor
     encoder_bias: list[float] | float | None = 0.0
     max_delay: int | None = 0
+    motor_constant: float | None = 0.0

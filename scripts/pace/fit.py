@@ -26,6 +26,7 @@ simulation_app = app_launcher.app
 """Rest everything follows."""
 
 import gymnasium as gym
+import numpy as np
 import torch
 
 import isaaclab_tasks  # noqa: F401
@@ -34,6 +35,26 @@ from isaaclab_tasks.utils import parse_env_cfg
 import pace_sim2real.tasks  # noqa: F401
 from pace_sim2real.utils import project_root
 from pace_sim2real import CMAESOptimizer
+
+
+def _patch_torch_from_numpy():
+    """Fallback conversion when torch's NumPy bridge is broken in this env."""
+    if getattr(torch.from_numpy, "_isaaclab_fallback", False):
+        return
+
+    orig_from_numpy = torch.from_numpy
+
+    def _from_numpy_safe(obj):
+        if isinstance(obj, np.ndarray):
+            # Avoid torch's NumPy bridge; it is broken in this env.
+            return torch.tensor(obj.tolist())
+        return orig_from_numpy(obj)
+
+    _from_numpy_safe._isaaclab_fallback = True
+    torch.from_numpy = _from_numpy_safe
+
+
+_patch_torch_from_numpy()
 
 
 def main():

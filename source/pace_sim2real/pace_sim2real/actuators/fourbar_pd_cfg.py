@@ -41,6 +41,7 @@ class PacefourbarDCMotorCfg(fourbarDCMotorCfg):
     class_type: type = fourbar_pd.PaceFourbarDCMotor
     encoder_bias: list[float] | float | None = 0.0
     max_delay: int | None = 0
+    motor_constant: list[float] | float | None = 0.0
 @configclass
 class fourbarPDActuatorReverseCfg(fourbarPDActuatorCfg):
 

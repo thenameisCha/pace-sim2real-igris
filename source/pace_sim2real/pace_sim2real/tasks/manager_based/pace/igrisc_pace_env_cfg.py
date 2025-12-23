@@ -27,6 +27,7 @@ MYACTUATOR_PACE_ACTUATOR = {
             },
             encoder_bias=[0.0] * 4,  # encoder bias in radians
             max_delay=10,  # max delay in simulation steps
+            motor_constant=[0.0] * 4  # motor constant in log scale
         ),
         "X8-120": PaceDCMotorCfg(
             joint_names_expr=[".*Hip_Roll.*"],
@@ -37,16 +38,24 @@ MYACTUATOR_PACE_ACTUATOR = {
             damping=3.,
             encoder_bias=[0.0] * 2,  # encoder bias in radians
             max_delay=10,  # max delay in simulation steps
+            motor_constant=[0.0] * 2  # motor constant in log scale
         ),
         "X8-60": PaceDCMotorCfg(
-            joint_names_expr=[".*Hip_Yaw.*"],
+            joint_names_expr=[".*Hip_Yaw.*", ".*Waist_Yaw.*"],
             velocity_limit=16.0,
             saturation_effort=60.,
             effort_limit=60.,
-            stiffness=100.,
-            damping=1.5,
-            encoder_bias=[0.0] * 2,  # encoder bias in radians
+            stiffness={
+                ".*Hip_Yaw.*": 100.,
+                ".*Waist_Yaw.*": 70.,
+            }, 
+            damping={
+                ".*Hip_Yaw.*": 1.5,
+                ".*Waist_Yaw.*": 1.8,
+            },
+            encoder_bias=[0.0] * 3,  # encoder bias in radians
             max_delay=10,  # max delay in simulation steps
+            motor_constant=[0.0] * 3  # motor constant in log scale
         ),
         "Lankle": PacefourbarDCMotorCfg(
             joint_names_expr=['Joint_Ankle_Pitch_Left', 'Joint_Ankle_Roll_Left'],
@@ -59,6 +68,7 @@ MYACTUATOR_PACE_ACTUATOR = {
             },
             encoder_bias=[0.0] * 2,  # encoder bias in radians
             max_delay=10,  # max delay in simulation steps
+            motor_constant=[0.0] * 2,  # motor constant in log scale
             constraints={
             'r_a_init_': [
                 [0.0, 0.03775, 0.26],
@@ -97,6 +107,7 @@ MYACTUATOR_PACE_ACTUATOR = {
             },
             encoder_bias=[0.0] * 2,  # encoder bias in radians
             max_delay=10,  # max delay in simulation steps
+            motor_constant=[0.0] * 2,  # motor constant in log scale
             constraints={
             'r_a_init_': [
                 [0.0, -0.03775, 0.26],
@@ -124,8 +135,8 @@ MYACTUATOR_PACE_ACTUATOR = {
             'is_elbow_up_': False
             }
         ),
-        "waist": PacefourbarDCMotorReverseCfg(
-            joint_names_expr=[".*Waist.*"],
+        "waist_fourbar": PacefourbarDCMotorReverseCfg(
+            joint_names_expr=[".*Waist_Roll.*", ".*Waist_Pitch.*"],
             velocity_limit=16.0,
             effort_limit=60,
             saturation_effort=60.0,
@@ -136,6 +147,7 @@ MYACTUATOR_PACE_ACTUATOR = {
             },
             encoder_bias=[0.0] * 2,  # encoder bias in radians
             max_delay=10,  # max delay in simulation steps
+            motor_constant=[0.0] * 2,  # motor constant in log scale
             constraints={
             'r_a_init_': [
                 [0.0, 0.0905, -0.04],
@@ -169,9 +181,10 @@ MYACTUATOR_PACE_ACTUATOR = {
 class IgrisCPaceCfg(PaceCfg):
     """Pace configuration for Igris-C robot."""
     robot_name: str = "igris_c_sim"
-    data_dir: str = "igris_c_sim/chirp_data.pt"  # located in pace_sim2real/data/igris_c_sim/chirp_data.pt
-    bounds_params: torch.Tensor = torch.zeros((57, 2))  # 14 + 14 + 14 + 14 + 1 = 57 parameters to optimize
+    data_dir: str = "igris_c_sim/waist/chirp_data.pt"  # located in pace_sim2real/data/igris_c_sim/chirp_data.pt
+    bounds_params: torch.Tensor = torch.zeros((76, 2))  # 15 + 15 + 15 + 15 + 15 + 1 = 76 parameters to optimize
     joint_order: list[str] = [
+        'Joint_Waist_Yaw', 
         'Joint_Waist_Roll', 
         'Joint_Waist_Pitch', 
         'Joint_Hip_Pitch_Left', 
@@ -190,14 +203,17 @@ class IgrisCPaceCfg(PaceCfg):
 
     def __post_init__(self):
         # set bounds for parameters
-        self.bounds_params[:14, 0] = 1e-5
-        self.bounds_params[:14, 1] = 5.0  # armature between 1e-5 - 1.0 [kgm2]
-        self.bounds_params[14:28, 1] = 30.0  # dof_damping between 0.0 - 7.0 [Nm s/rad]
-        self.bounds_params[28:42, 1] = 5.  # friction between 0.0 - 0.5
-        self.bounds_params[42:56, 0] = -0.1
-        self.bounds_params[42:56, 1] = 0.1  # bias between -0.1 - 0.1 [rad]
-        self.bounds_params[56, 0] = 1.0  # delay between 0.0 - 10.0 [sim steps]
-        self.bounds_params[56, 1] = 5.0  # delay between 0.0 - 10.0 [sim steps]
+        self.bounds_params[:15, 0] = 1e-5
+        self.bounds_params[:15, 1] = 5.0  # armature between 1e-5 - 1.0 [kgm2]
+        self.bounds_params[15:30, 1] = 50.0  # dof_damping between 0.0 - 7.0 [Nm s/rad]
+        self.bounds_params[16:18, 1] = 100.0  # More damping in waist pitch and roll
+        self.bounds_params[30:45, 1] = 10.  # friction between 0.0 - 0.5
+        self.bounds_params[45:60, 0] = -0.2
+        self.bounds_params[45:60, 1] = 0.2  # bias between -0.1 - 0.1 [rad]
+        self.bounds_params[60:75, 0] = -0.7
+        self.bounds_params[60:75, 1] = 0.6  # torque constant between  exp(-1.) - exp(1.) [Nm/A]
+        self.bounds_params[75, 0] = 1.0  # delay between 0.0 - 10.0 [sim steps]
+        self.bounds_params[75, 1] = 3.0  # delay between 0.0 - 10.0 [sim steps]
 
 
 @configclass

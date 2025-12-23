@@ -5,6 +5,7 @@
 from __future__ import annotations
 
 import cmaes
+import numpy as np
 import torch
 from torch.utils.tensorboard import SummaryWriter as TensorboardSummaryWriter
 from datetime import datetime
@@ -41,7 +42,15 @@ class CMAESOptimizer:
         bounds_normalized[:, 0] *= -1
         mean_normalized = torch.zeros_like(bounds[:, 0])
 
-        self.optimizer = cmaes.CMA(mean=mean_normalized.cpu().numpy(), sigma=sigma, bounds=bounds_normalized.cpu().numpy(), seed=0, population_size=population_size)
+        mean_np = np.asarray(mean_normalized.cpu().tolist())
+        bounds_np = np.asarray(bounds_normalized.cpu().tolist())
+        self.optimizer = cmaes.CMA(
+            mean=mean_np,
+            sigma=sigma,
+            bounds=bounds_np,
+            seed=0,
+            population_size=population_size,
+        )
 
         self.scores_counter = 0
         self.iteration_counter = 0
@@ -60,7 +69,8 @@ class CMAESOptimizer:
         self.damping_idx = slice(num_joints, 2 * num_joints)
         self.friction_idx = slice(2 * num_joints, 3 * num_joints)
         self.bias_idx = slice(3 * num_joints, 4 * num_joints)
-        self.delay_idx = 4 * num_joints
+        self.motor_constant_idx = slice(4 * num_joints, 5 * num_joints) # motor constant
+        self.delay_idx = 5 * num_joints
 
         self._reset_population()
         print("CMA-ES optimizer initialized.")
@@ -81,7 +91,8 @@ class CMAESOptimizer:
             self.sim_params_buffer[self.iteration_counter, :, :] = self.sim_params
         solutions = []
         for i in range(self.optimizer.population_size):
-            solutions.append((self.params[i].cpu().numpy(), self.scores[i].item()))
+            params_np = np.asarray(self.params[i].cpu().tolist())
+            solutions.append((params_np, self.scores[i].item()))
         self.optimizer.tell(solutions)
         if self.save_interval > 0 and self.iteration_counter % self.save_interval == 0:
             self.save_checkpoint(self._params_to_sim_params(torch.tensor(self.optimizer._mean, device=self.device)), self.iteration_counter)
@@ -105,7 +116,7 @@ class CMAESOptimizer:
 
     def _reset_population(self):
         for i in range(self.optimizer.population_size):
-            self.params[i, :] = torch.tensor(self.optimizer.ask(), device=self.device)
+            self.params[i, :] = torch.tensor(self.optimizer.ask().tolist(), device=self.device)
         self.sim_params = self._params_to_sim_params(self.params)
 
     def update_simulator(self, articulation, joint_ids, initial_position):
@@ -127,6 +138,7 @@ class CMAESOptimizer:
             drive_joint_idx = torch.argmax(comparison_matrix.int(), dim=0)
             articulation.actuators[drive_type].update_encoder_bias(self.sim_params[:, self.bias_idx][:, drive_joint_idx])
             articulation.actuators[drive_type].update_time_lags(self.sim_params[:, self.delay_idx].to(torch.int))
+            articulation.actuators[drive_type].update_motor_constant(self.sim_params[:, self.motor_constant_idx][:, drive_joint_idx])
             articulation.actuators[drive_type].reset(env_ids)
 
     def _print_iteration(self):
@@ -139,6 +151,7 @@ class CMAESOptimizer:
         print("Damping: ", self.sim_params[min_index, self.damping_idx].tolist())
         print("Friction: ", self.sim_params[min_index, self.friction_idx].tolist())
         print("Bias: ", self.sim_params[min_index, self.bias_idx].tolist())
+        print("Motor constant: ", self.sim_params[min_index, self.motor_constant_idx].tolist())
         print("Delay: ", self.sim_params[min_index, self.delay_idx].tolist())
         print(f"Elapsed time: {(datetime.now() - self._timer_start).total_seconds():.1f} seconds")
         self._timer_start = datetime.now()
@@ -150,18 +163,20 @@ class CMAESOptimizer:
         return sim_params
 
     def get_best_sim_params(self):
-        best_params = torch.tensor(self.optimizer._mean)
+        best_params = torch.tensor(self.optimizer._mean.tolist())
         return self._params_to_sim_params(best_params)
 
     def _log(self):
         min_score, min_score_index = torch.min(self.scores, dim=0)
         max_score, _ = torch.max(self.scores, dim=0)
         for i in range(len(self.joint_order)):
+            self.writer.add_histogram("5_MotorConstant/distribution_" + self.joint_order[i], self.sim_params[:, self.motor_constant_idx][:, i], self.iteration_counter)
             self.writer.add_histogram("4_Bias/distribution_" + self.joint_order[i], self.sim_params[:, self.bias_idx][:, i], self.iteration_counter)
             self.writer.add_histogram("3_Friction/distribution_" + self.joint_order[i], self.sim_params[:, self.friction_idx][:, i], self.iteration_counter)
             self.writer.add_histogram("2_Damping/distribution_" + self.joint_order[i], self.sim_params[:, self.damping_idx][:, i], self.iteration_counter)
             self.writer.add_histogram("1_Armature/distribution_" + self.joint_order[i], self.sim_params[:, self.armature_idx][:, i], self.iteration_counter)
 
+            self.writer.add_scalar("5_MotorConstant/best_" + self.joint_order[i], self.sim_params[min_score_index, self.motor_constant_idx][i].item(), self.iteration_counter)
             self.writer.add_scalar("4_Bias/best_" + self.joint_order[i], self.sim_params[min_score_index, self.bias_idx][i].item(), self.iteration_counter)
             self.writer.add_scalar("3_Friction/best_" + self.joint_order[i], self.sim_params[min_score_index, self.friction_idx][i].item(), self.iteration_counter)
             self.writer.add_scalar("2_Damping/best_" + self.joint_order[i], self.sim_params[min_score_index, self.damping_idx][i].item(), self.iteration_counter)

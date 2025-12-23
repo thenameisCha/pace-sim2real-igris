@@ -40,7 +40,13 @@ class PaceDCMotor(DCMotor):
                     f"but got {len(cfg.encoder_bias)}: {cfg.encoder_bias}"
                 )
         self.encoder_bias = torch.tensor(cfg.encoder_bias, device=self._device).unsqueeze(0).repeat(self._num_envs, 1)
-
+        if isinstance(cfg.motor_constant, (list, tuple)):
+            if len(cfg.motor_constant) != self.num_joints:
+                raise ValueError(
+                    f"motor_constant must have {self.num_joints} elements (one per joint), "
+                    f"but got {len(cfg.motor_constant)}: {cfg.motor_constant}"
+                )
+        self.motor_constant = torch.tensor(cfg.motor_constant, device=self._device).unsqueeze(0).repeat(self._num_envs, 1)
         self.torques_delay_buffer = DelayBuffer(cfg.max_delay + 1, self._num_envs, device=self._device)
         self.torques_delay_buffer.set_time_lag(cfg.max_delay, torch.arange(self._num_envs, device=self._device))
 
@@ -52,6 +58,9 @@ class PaceDCMotor(DCMotor):
     def update_encoder_bias(self, encoder_bias: torch.Tensor):
         self.encoder_bias = encoder_bias
 
+    def update_motor_constant(self, motor_constant: torch.Tensor):
+        self.motor_constant = motor_constant
+
     def update_time_lags(self, delay: int | torch.Tensor, env_ids: Sequence[int] | None = None):
         if env_ids is None:
             env_ids = torch.arange(self._num_envs, device=self._device)
@@ -62,5 +71,5 @@ class PaceDCMotor(DCMotor):
     ) -> ArticulationActions:
         # compute actuator model with encoder bias added to joint positions (joint position in encoder frame, not simulation frame)
         control_action_sim = super().compute(control_action, joint_pos - self.encoder_bias, joint_vel)
-        control_action_sim.joint_efforts = self.torques_delay_buffer.compute(control_action_sim.joint_efforts)
+        control_action_sim.joint_efforts = self.torques_delay_buffer.compute(control_action_sim.joint_efforts) * torch.exp(self.motor_constant)
         return control_action_sim
