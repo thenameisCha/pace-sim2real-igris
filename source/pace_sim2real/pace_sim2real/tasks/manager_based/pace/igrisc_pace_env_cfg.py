@@ -27,7 +27,7 @@ MYACTUATOR_PACE_ACTUATOR = {
             },
             encoder_bias=[0.0] * 4,  # encoder bias in radians
             max_delay=10,  # max delay in simulation steps
-            motor_constant=[0.0] * 4  # motor constant in log scale
+            motor_constant=[0.0] * 4,  # motor constant in log scale
         ),
         "X8-120": PaceDCMotorCfg(
             joint_names_expr=[".*Hip_Roll.*"],
@@ -38,7 +38,7 @@ MYACTUATOR_PACE_ACTUATOR = {
             damping=3.,
             encoder_bias=[0.0] * 2,  # encoder bias in radians
             max_delay=10,  # max delay in simulation steps
-            motor_constant=[0.0] * 2  # motor constant in log scale
+            motor_constant=[0.0] * 2,  # motor constant in log scale
         ),
         "X8-60": PaceDCMotorCfg(
             joint_names_expr=[".*Hip_Yaw.*", ".*Waist_Yaw.*"],
@@ -55,7 +55,7 @@ MYACTUATOR_PACE_ACTUATOR = {
             },
             encoder_bias=[0.0] * 3,  # encoder bias in radians
             max_delay=10,  # max delay in simulation steps
-            motor_constant=[0.0] * 3  # motor constant in log scale
+            motor_constant=[0.0] * 3,  # motor constant in log scale
         ),
         "Lankle": PacefourbarDCMotorCfg(
             joint_names_expr=['Joint_Ankle_Pitch_Left', 'Joint_Ankle_Roll_Left'],
@@ -182,7 +182,7 @@ class IgrisCPaceCfg(PaceCfg):
     """Pace configuration for Igris-C robot."""
     robot_name: str = "igris_c_sim"
     data_dir: str = "igris_c_sim/waist/chirp_data.pt"  # located in pace_sim2real/data/igris_c_sim/chirp_data.pt
-    bounds_params: torch.Tensor = torch.zeros((76, 2))  # 15 + 15 + 15 + 15 + 15 + 1 = 76 parameters to optimize
+    bounds_params: torch.Tensor = torch.zeros((65, 2))  # 15 + 15 + 15 + 15 + 4 + 1 = 65 parameters to optimize
     joint_order: list[str] = [
         'Joint_Waist_Yaw', 
         'Joint_Waist_Roll', 
@@ -200,6 +200,35 @@ class IgrisCPaceCfg(PaceCfg):
         'Joint_Ankle_Pitch_Right', 
         'Joint_Ankle_Roll_Right'
     ]
+    drive_id: list[str] = [ # Actuator models in the real robot
+        'X8-60',
+        'X12-90',
+        'X8-120',
+        'X12-150',
+    ]
+    drive_dict: dict[str] = {
+        'X8-60': {
+            'id': 0
+        }, 
+        'X12-90': {
+            'id': 1
+        }, 
+        'X8-120': {
+            'id': 2
+        }, 
+        'X12-150': {
+            'id': 3
+        }, 
+        'waist_fourbar': {
+            'id': 0
+        }, 
+        'Lankle': {
+            'id': 1
+        }, 
+        'Rankle': {
+            'id': 1
+        }
+    }
 
     def __post_init__(self):
         # set bounds for parameters
@@ -210,10 +239,14 @@ class IgrisCPaceCfg(PaceCfg):
         self.bounds_params[30:45, 1] = 10.  # friction between 0.0 - 0.5
         self.bounds_params[45:60, 0] = -0.2
         self.bounds_params[45:60, 1] = 0.2  # bias between -0.1 - 0.1 [rad]
-        self.bounds_params[60:75, 0] = -0.7
-        self.bounds_params[60:75, 1] = 0.6  # torque constant between  exp(-1.) - exp(1.) [Nm/A]
-        self.bounds_params[75, 0] = 1.0  # delay between 0.0 - 10.0 [sim steps]
-        self.bounds_params[75, 1] = 3.0  # delay between 0.0 - 10.0 [sim steps]
+        self.bounds_params[60:64, 0] = -0.7 # Motor constants in log scale, [60, 90, 120, 150] Nm
+        self.bounds_params[60:64, 1] = 0.7
+        self.bounds_params[61, 0] = -0.0
+        self.bounds_params[61, 1] = 0.0
+        self.bounds_params[63, 0] = -0.3
+        self.bounds_params[63, 1] = 0.3
+        self.bounds_params[64, 0] = 1.0  # delay between 0.0 - 10.0 [sim steps]
+        self.bounds_params[64, 1] = 3.0  # delay between 0.0 - 10.0 [sim steps]
 
 
 @configclass

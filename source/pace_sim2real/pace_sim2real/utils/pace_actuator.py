@@ -59,7 +59,8 @@ class PaceDCMotor(DCMotor):
         self.encoder_bias = encoder_bias
 
     def update_motor_constant(self, motor_constant: torch.Tensor):
-        self.motor_constant = motor_constant
+        for _ in range(self.motor_constant.shape[1]):
+            self.motor_constant[:, _] = motor_constant[:]
 
     def update_time_lags(self, delay: int | torch.Tensor, env_ids: Sequence[int] | None = None):
         if env_ids is None:

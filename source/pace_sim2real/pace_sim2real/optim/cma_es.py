@@ -13,9 +13,11 @@ import os
 
 
 class CMAESOptimizer:
-    def __init__(self, bounds, population_size, log_dir, joint_order, max_iteration, data, device, epsilon=None, sigma=0.5, save_interval=10, save_optimization_process=False):
+    def __init__(self, bounds, population_size, log_dir, joint_order, drive_id, drive_dict, max_iteration, data, device, epsilon=None, sigma=0.5, save_interval=10, save_optimization_process=False):
 
         self.joint_order = joint_order
+        self.drive_id = drive_id
+        self.drive_dict = drive_dict
         self.max_iteration = max_iteration
         self.epsilon = epsilon
         self.save_interval = save_interval
@@ -69,8 +71,8 @@ class CMAESOptimizer:
         self.damping_idx = slice(num_joints, 2 * num_joints)
         self.friction_idx = slice(2 * num_joints, 3 * num_joints)
         self.bias_idx = slice(3 * num_joints, 4 * num_joints)
-        self.motor_constant_idx = slice(4 * num_joints, 5 * num_joints) # motor constant
-        self.delay_idx = 5 * num_joints
+        self.motor_constant_idx = slice(4 * num_joints, 4 * num_joints + len(self.drive_id)) # motor constant
+        self.delay_idx = 4 * num_joints + len(self.drive_id)  # delay
 
         self._reset_population()
         print("CMA-ES optimizer initialized.")
@@ -138,7 +140,7 @@ class CMAESOptimizer:
             drive_joint_idx = torch.argmax(comparison_matrix.int(), dim=0)
             articulation.actuators[drive_type].update_encoder_bias(self.sim_params[:, self.bias_idx][:, drive_joint_idx])
             articulation.actuators[drive_type].update_time_lags(self.sim_params[:, self.delay_idx].to(torch.int))
-            articulation.actuators[drive_type].update_motor_constant(self.sim_params[:, self.motor_constant_idx][:, drive_joint_idx])
+            articulation.actuators[drive_type].update_motor_constant(self.sim_params[:, self.motor_constant_idx][:, self.drive_dict[drive_type]['id']])
             articulation.actuators[drive_type].reset(env_ids)
 
     def _print_iteration(self):
@@ -170,20 +172,21 @@ class CMAESOptimizer:
         min_score, min_score_index = torch.min(self.scores, dim=0)
         max_score, _ = torch.max(self.scores, dim=0)
         for i in range(len(self.joint_order)):
-            self.writer.add_histogram("5_MotorConstant/distribution_" + self.joint_order[i], self.sim_params[:, self.motor_constant_idx][:, i], self.iteration_counter)
             self.writer.add_histogram("4_Bias/distribution_" + self.joint_order[i], self.sim_params[:, self.bias_idx][:, i], self.iteration_counter)
             self.writer.add_histogram("3_Friction/distribution_" + self.joint_order[i], self.sim_params[:, self.friction_idx][:, i], self.iteration_counter)
             self.writer.add_histogram("2_Damping/distribution_" + self.joint_order[i], self.sim_params[:, self.damping_idx][:, i], self.iteration_counter)
             self.writer.add_histogram("1_Armature/distribution_" + self.joint_order[i], self.sim_params[:, self.armature_idx][:, i], self.iteration_counter)
 
-            self.writer.add_scalar("5_MotorConstant/best_" + self.joint_order[i], self.sim_params[min_score_index, self.motor_constant_idx][i].item(), self.iteration_counter)
             self.writer.add_scalar("4_Bias/best_" + self.joint_order[i], self.sim_params[min_score_index, self.bias_idx][i].item(), self.iteration_counter)
             self.writer.add_scalar("3_Friction/best_" + self.joint_order[i], self.sim_params[min_score_index, self.friction_idx][i].item(), self.iteration_counter)
             self.writer.add_scalar("2_Damping/best_" + self.joint_order[i], self.sim_params[min_score_index, self.damping_idx][i].item(), self.iteration_counter)
             self.writer.add_scalar("1_Armature/best_" + self.joint_order[i], self.sim_params[min_score_index, self.armature_idx][i].item(), self.iteration_counter)
+        for i in range(len(self.drive_id)):
+            self.writer.add_histogram("5_MotorConstant/distribution_" + self.drive_id[i], self.sim_params[:, self.motor_constant_idx][:, i], self.iteration_counter)
+            self.writer.add_scalar("5_MotorConstant/best_" + self.drive_id[i], self.sim_params[min_score_index, self.motor_constant_idx][i].item(), self.iteration_counter)
+
         self.writer.add_histogram("0_Delay/distribution", self.sim_params[:, self.delay_idx], self.iteration_counter)
         self.writer.add_scalar("0_Delay/best", self.sim_params[min_score_index, self.delay_idx].item(), self.iteration_counter)
-
         self.writer.add_scalar("0_Episode/score", min_score.item(), self.iteration_counter)
         self.writer.add_scalar("0_Episode/max_score", max_score.item(), self.iteration_counter)
         self.writer.add_scalar("0_Episode/diff_score", (max_score - min_score) / min_score, self.iteration_counter)

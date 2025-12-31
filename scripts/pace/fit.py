@@ -74,6 +74,8 @@ def main():
     bounds_params = env_cfg.sim2real.bounds_params.to(env.unwrapped.device)
     articulation = env.unwrapped.scene["robot"]
     joint_order = env_cfg.sim2real.joint_order
+    drive_dict = env_cfg.sim2real.drive_dict
+    drive_id = env_cfg.sim2real.drive_id
     sim_joint_ids = torch.tensor([articulation.joint_names.index(name) for name in joint_order], device=env.unwrapped.device)
 
     data_file = project_root() / "data" / env_cfg.sim2real.data_dir
@@ -94,6 +96,8 @@ def main():
         population_size=env.unwrapped.num_envs,
         log_dir=log_dir,
         joint_order=joint_order,
+        drive_dict=drive_dict,
+        drive_id=drive_id,
         max_iteration=env_cfg.sim2real.cmaes.max_iteration,
         data=data,
         device=env.unwrapped.device,
