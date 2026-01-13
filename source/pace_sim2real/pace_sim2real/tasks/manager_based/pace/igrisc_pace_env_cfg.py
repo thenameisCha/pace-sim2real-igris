@@ -181,7 +181,7 @@ MYACTUATOR_PACE_ACTUATOR = {
 class IgrisCPaceCfg(PaceCfg):
     """Pace configuration for Igris-C robot."""
     robot_name: str = "igris_c_sim"
-    data_dir: str = "igris_c_sim/waist/chirp_data.pt"  # located in pace_sim2real/data/igris_c_sim/chirp_data.pt
+    data_dir: str = "igris_c_sim/waist/0113/chirp_data_0113.pt"  # located in pace_sim2real/data/igris_c_sim/chirp_data.pt
     bounds_params: torch.Tensor = torch.zeros((65, 2))  # 15 + 15 + 15 + 15 + 4 + 1 = 65 parameters to optimize
     joint_order: list[str] = [
         'Joint_Waist_Yaw', 
