@@ -33,6 +33,7 @@ class CMAESOptimizer:
         self.writer = TensorboardSummaryWriter(log_dir=log_dir)
         torch.save({"bounds": bounds,
                     "joint_order": joint_order,
+                    "drive_id": drive_id,
                     "dof_pos": data["dof_pos"],
                     "des_dof_pos": data["des_dof_pos"],
                     "time": data["time"]
