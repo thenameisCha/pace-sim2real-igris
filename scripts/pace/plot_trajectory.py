@@ -125,6 +125,6 @@ if plot_trajectory:
         plt.grid()
         plt.tight_layout()
         # plt.show()
-        plt.savefig(f'/home/robros/lab_ws/pace-sim2real-igris/scripts/pace//best_trajectory_{joint_order[i]}.png')
+        plt.savefig(f'/home/robros/isaac_ws/pace-sim2real-igris/scripts/pace//best_trajectory_{joint_order[i]}.png')
 
 print("Plotting complete.")

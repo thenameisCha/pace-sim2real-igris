@@ -1,0 +1,22 @@
+<mujoco model="single_motor">
+  <compiler angle="radian" coordinate="local"/>
+  <option gravity="0 0 -9.81" timestep="0.001"/>
+
+  <worldbody>
+    <!-- Fixed base link (no joint => fixed in world) -->
+    <body name="base" pos="0 0 0.2">
+      <geom name="base_geom" type="box" size="0.02 0.02 0.01" mass="0.1" rgba="0.2 0.2 0.2 1"/>
+      <freejoint name="floating_base" />
+      <inertial pos="0.00175 0.00112 0.01" mass="12.974" fullinertia="0.15110 0.12880 0.08070 -0.00136 0.00843 -0.00089"/>
+      <!-- 1-DOF revolute joint on the child link -->
+      <body name="dummy_link" pos="0 0 0">
+        <joint name="motor_joint" type="hinge" axis="0 0 1" range="-3.1416 3.1416" limited="true" armature="0.1"/>
+
+        <!-- Very light, short rod for visible motion -->
+        <inertial mass="1e-4" diaginertia="1e-6 1e-6 1e-6"/>
+        <geom name="dummy_rod" type="capsule" fromto="0 0 0 0.06 0 0" size="0.004" rgba="0.8 0.1 0.1 1"/>
+        <site name="tip_site" pos="0.06 0 0" size="0.003" rgba="1 0 0 1"/>
+      </body>
+    </body>
+  </worldbody>
+</mujoco>

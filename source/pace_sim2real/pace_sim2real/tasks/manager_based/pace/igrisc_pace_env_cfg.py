@@ -18,12 +18,12 @@ MYACTUATOR_PACE_ACTUATOR = {
             saturation_effort=150.,
             effort_limit=150.,
             stiffness={
-                ".*Hip_Pitch.*": 150.,
-                ".*Knee.*": 150.,
+                ".*Hip_Pitch.*": 177.0,
+                ".*Knee.*": 177.0,
             }, 
             damping={
-                ".*Hip_Pitch.*": 2.,
-                ".*Knee.*": 1.,
+                ".*Hip_Pitch.*": 14.0,
+                ".*Knee.*": 14.0,
             },
             encoder_bias=[0.0] * 4,  # encoder bias in radians
             max_delay=10,  # max delay in simulation steps
@@ -34,8 +34,8 @@ MYACTUATOR_PACE_ACTUATOR = {
             velocity_limit=16.54,
             saturation_effort=120.,
             effort_limit=120.,
-            stiffness=150.,
-            damping=3.,
+            stiffness=148.0,
+            damping=11.6,
             encoder_bias=[0.0] * 2,  # encoder bias in radians
             max_delay=10,  # max delay in simulation steps
             motor_constant=[0.0] * 2,  # motor constant in log scale
@@ -46,12 +46,12 @@ MYACTUATOR_PACE_ACTUATOR = {
             saturation_effort=60.,
             effort_limit=60.,
             stiffness={
-                ".*Hip_Yaw.*": 100.,
-                ".*Waist_Yaw.*": 70.,
+                ".*Hip_Yaw.*": 60.,
+                ".*Waist_Yaw.*": 60.,
             }, 
             damping={
-                ".*Hip_Yaw.*": 1.5,
-                ".*Waist_Yaw.*": 1.8,
+                ".*Hip_Yaw.*": 4.7,
+                ".*Waist_Yaw.*": 4.7,
             },
             encoder_bias=[0.0] * 3,  # encoder bias in radians
             max_delay=10,  # max delay in simulation steps
@@ -62,9 +62,9 @@ MYACTUATOR_PACE_ACTUATOR = {
             velocity_limit=13.61,
             saturation_effort=90,
             effort_limit={".*": 90},
-            stiffness={".*": 50.0},  # P gain in Nm/rad
+            stiffness={".*": 120.0},  # P gain in Nm/rad
             damping={
-                ".*": 3.,
+                ".*": 9.5,
             },
             encoder_bias=[0.0] * 2,  # encoder bias in radians
             max_delay=10,  # max delay in simulation steps
@@ -101,9 +101,9 @@ MYACTUATOR_PACE_ACTUATOR = {
             velocity_limit=13.61,
             saturation_effort=90,
             effort_limit={".*": 90},
-            stiffness={".*": 50.0},  # P gain in Nm/rad
+            stiffness={".*": 120.0},  # P gain in Nm/rad
             damping={
-                ".*": 3.,
+                ".*": 9.5,
             },
             encoder_bias=[0.0] * 2,  # encoder bias in radians
             max_delay=10,  # max delay in simulation steps
@@ -140,10 +140,10 @@ MYACTUATOR_PACE_ACTUATOR = {
             velocity_limit=16.0,
             effort_limit=60,
             saturation_effort=60.0,
-            stiffness={".*": 70.0},  # P gain in Nm/rad
+            stiffness={".*": 60.},  # P gain in Nm/rad
             damping={
-                '.*Roll.*': 1.8,
-                '.*Pitch.*': 1.8,
+                '.*Roll.*': 4.7,
+                '.*Pitch.*': 4.7,
             },
             encoder_bias=[0.0] * 2,  # encoder bias in radians
             max_delay=10,  # max delay in simulation steps
@@ -181,7 +181,7 @@ MYACTUATOR_PACE_ACTUATOR = {
 class IgrisCPaceCfg(PaceCfg):
     """Pace configuration for Igris-C robot."""
     robot_name: str = "igris_c_sim"
-    data_dir: str = "igris_c_sim/waist/0113/chirp_data_0113.pt"  # located in pace_sim2real/data/igris_c_sim/chirp_data.pt
+    data_dir: str = "igris_c_sim/waist/0210/chirp_data.pt"  # located in pace_sim2real/data/igris_c_sim/chirp_data.pt
     bounds_params: torch.Tensor = torch.zeros((65, 2))  # 15 + 15 + 15 + 15 + 4 + 1 = 65 parameters to optimize
     joint_order: list[str] = [
         'Joint_Waist_Yaw', 
@@ -232,21 +232,25 @@ class IgrisCPaceCfg(PaceCfg):
 
     def __post_init__(self):
         # set bounds for parameters
-        self.bounds_params[:15, 0] = 1e-5
-        self.bounds_params[:15, 1] = 5.0  # armature between 1e-5 - 1.0 [kgm2]
-        self.bounds_params[15:30, 1] = 50.0  # dof_damping between 0.0 - 7.0 [Nm s/rad]
-        self.bounds_params[16:18, 1] = 100.0  # More damping in waist pitch and roll
-        self.bounds_params[30:45, 1] = 10.  # friction between 0.0 - 0.5
+        self.bounds_params[[0,5,11]] = 0.019
+        self.bounds_params[1] = 0.1242938
+        self.bounds_params[2] = 0.0472087
+        self.bounds_params[[3,6, 9,12]] = 0.117
+        self.bounds_params[[4,10]] = 0.055
+        self.bounds_params[[7,13]] = 0.1396316
+        self.bounds_params[[8,14]] = 0.1160782
+
+        # self.bounds_params[:15, 0] = 1e-5
+        # self.bounds_params[:15, 1] = 1.0  # armature between 1e-5 - 1.0 [kgm2]
+        self.bounds_params[15:30, 1] = 20.0  # dof_damping between 0.0 - 7.0 [Nm s/rad]
+        self.bounds_params[16:18, 1] = 50.0  # More damping in waist pitch and roll
+        self.bounds_params[30:45, 1] = 5.  # friction between 0.0 - 0.5
         self.bounds_params[45:60, 0] = -0.2
         self.bounds_params[45:60, 1] = 0.2  # bias between -0.1 - 0.1 [rad]
-        self.bounds_params[60:64, 0] = -0.7 # Motor constants in log scale, [60, 90, 120, 150] Nm
-        self.bounds_params[60:64, 1] = 0.7
-        self.bounds_params[61, 0] = -0.0
-        self.bounds_params[61, 1] = 0.0
-        self.bounds_params[63, 0] = -0.3
-        self.bounds_params[63, 1] = 0.3
+        self.bounds_params[60:64, 0] = -0. # Motor constants in log scale, [60, 90, 120, 150] Nm
+        self.bounds_params[60:64, 1] = 0.
         self.bounds_params[64, 0] = 1.0  # delay between 0.0 - 10.0 [sim steps]
-        self.bounds_params[64, 1] = 3.0  # delay between 0.0 - 10.0 [sim steps]
+        self.bounds_params[64, 1] = 5.0  # delay between 0.0 - 10.0 [sim steps]
 
 
 @configclass
@@ -266,6 +270,5 @@ class IgrisCPaceEnvCfg(PaceSim2realEnvCfg):
         # post init of parent
         super().__post_init__()
 
-        # robot sim and control settings
-        self.sim.dt = 0.003333  # 300Hz simulation
-        self.decimation = 1  # 300Hz control
+        self.sim.dt = 1/300.  # 900Hz simulation
+        self.decimation = 1  # 300Hz control1

@@ -21,3 +21,20 @@ gym.register(
         "env_cfg_entry_point": f"{__name__}.pace.igrisc_pace_env_cfg:IgrisCPaceEnvCfg"
     },
 )
+gym.register(
+    id="noleg_Isaac-Pace-Igris-C",
+    entry_point="isaaclab.envs:ManagerBasedRLEnv",
+    disable_env_checker=True,
+    kwargs={
+        "env_cfg_entry_point": f"{__name__}.pace.noleg_igrisc_pace_env_cfg:IgrisCPaceEnvCfg"
+    },
+)
+
+gym.register(
+    id="Isaac-Pace-Single-Motor",
+    entry_point="isaaclab.envs:ManagerBasedRLEnv",
+    disable_env_checker=True,
+    kwargs={
+        "env_cfg_entry_point": f"{__name__}.pace.single_motor_pace_env_cfg:MotorPaceEnvCfg"
+    },
+)
