@@ -22,8 +22,8 @@ MYACTUATOR_PACE_ACTUATOR = {
                 ".*Knee.*": 143.3,
             }, 
             damping={
-                ".*Hip_Pitch.*": 9.81,
-                ".*Knee.*": 9.81,
+                ".*Hip_Pitch.*": 8.36,
+                ".*Knee.*": 8.36,
             },
             encoder_bias=[0.0] * 4,  # encoder bias in radians
             max_delay=10,  # max delay in simulation steps
@@ -35,7 +35,7 @@ MYACTUATOR_PACE_ACTUATOR = {
             saturation_effort=240.,
             effort_limit=120.,
             stiffness=139.0,
-            damping=8.76,
+            damping=7.33,
             encoder_bias=[0.0] * 2,  # encoder bias in radians
             max_delay=10,  # max delay in simulation steps
             motor_constant=[0.0] * 2,  # motor constant in log scale
@@ -50,8 +50,8 @@ MYACTUATOR_PACE_ACTUATOR = {
                 ".*Waist_Yaw.*": 48.0,
             }, 
             damping={
-                ".*Hip_Yaw.*": 3.02,
-                ".*Waist_Yaw.*": 3.02,
+                ".*Hip_Yaw.*": 2.53,
+                ".*Waist_Yaw.*": 2.53,
             },
             encoder_bias=[0.0] * 3,  # encoder bias in radians
             max_delay=10,  # max delay in simulation steps
@@ -64,7 +64,7 @@ MYACTUATOR_PACE_ACTUATOR = {
             effort_limit={".*": 90},
             stiffness={".*": 107.48},  # P gain in Nm/rad
             damping={
-                ".*": 7.35,
+                ".*": 6.27,
             },
             encoder_bias=[0.0] * 2,  # encoder bias in radians
             max_delay=10,  # max delay in simulation steps
@@ -103,7 +103,7 @@ MYACTUATOR_PACE_ACTUATOR = {
             effort_limit={".*": 90},
             stiffness={".*": 107.48},  # P gain in Nm/rad
             damping={
-                ".*": 7.35,
+                ".*": 6.27,
             },
             encoder_bias=[0.0] * 2,  # encoder bias in radians
             max_delay=10,  # max delay in simulation steps
@@ -142,7 +142,7 @@ MYACTUATOR_PACE_ACTUATOR = {
             saturation_effort=120.0,
             stiffness={".*": 48.0},  # P gain in Nm/rad
             damping={
-                '.*.*': 3.02,
+                '.*.*': 2.53,
             },
             encoder_bias=[0.0] * 2,  # encoder bias in radians
             max_delay=10,  # max delay in simulation steps
@@ -180,7 +180,7 @@ MYACTUATOR_PACE_ACTUATOR = {
 class IgrisCPaceCfg(PaceCfg):
     """Pace configuration for Igris-C robot."""
     robot_name: str = "igris_c_sim"
-    data_dir: str = "igris_c_sim/waist/0224/fbw28/chirp_data.pt"  # located in pace_sim2real/data/igris_c_sim/chirp_data.pt
+    data_dir: str = "igris_c_sim/waist/0225/robot8/fbw35/chirp_data.pt"  # located in pace_sim2real/data/igris_c_sim/chirp_data.pt
     bounds_params: torch.Tensor = torch.zeros((65, 2))  # 15 + 15 + 15 + 15 + 4 + 1 = 65 parameters to optimize
     joint_order: list[str] = [
         'Joint_Waist_Yaw', 
