@@ -135,17 +135,22 @@ class IgrisCPaceCfg(PaceCfg):
 
     def __post_init__(self):
         # set bounds for parameters
-        self.bounds_params[0, :] = 0.019
-        self.bounds_params[1] = 0.1242938
-        self.bounds_params[2] = 0.0472087
-        self.bounds_params[[3, 5]] = 0.117
-        self.bounds_params[[4,6]] = 0.055
+        self.bounds_params[0, 0] = 0.019
+        self.bounds_params[1, 0] = 0.1242938
+        self.bounds_params[2, 0] = 0.0472087
+        self.bounds_params[[3, 5], 0] = 0.117
+        self.bounds_params[[4,6], 0] = 0.055
+        self.bounds_params[0, 1] = 0.019*1.5
+        self.bounds_params[1, 1] = 0.1242938*1.5
+        self.bounds_params[2, 1] = 0.0472087*1.5
+        self.bounds_params[[3, 5], 1] = 0.117*1.5
+        self.bounds_params[[4,6], 1] = 0.055*1.5
 
         # self.bounds_params[:15, 0] = 1e-5
         # self.bounds_params[:15, 1] = 1.0  # armature between 1e-5 - 1.0 [kgm2]
-        self.bounds_params[7:14, 1] = 7.0  # dof_damping between 0.0 - 7.0 [Nm s/rad]
-        self.bounds_params[8, 1] = 50.0  # More damping in waist pitch and roll
-        self.bounds_params[9, 1] = 15.0  # More damping in waist pitch and roll
+        self.bounds_params[7:14, 1] = 5.0  # dof_damping between 0.0 - 7.0 [Nm s/rad]
+        self.bounds_params[8, 1] = 20.0  # More damping in waist pitch and roll
+        self.bounds_params[9, 1] = 10.0  # More damping in waist pitch and roll
         self.bounds_params[14:21, 1] = 5.  # friction between 0.0 - 0.5
         self.bounds_params[21:28, 0] = -0.2
         self.bounds_params[21:28, 1] = 0.2  # bias between -0.1 - 0.1 [rad]

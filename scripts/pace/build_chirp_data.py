@@ -19,7 +19,7 @@ def load_npz(path: Path, position_key: str, num_joints: int) -> torch.Tensor:
             f"{path} only has {arr.shape[1]} joints, expected at least {num_joints}"
         )
     return torch.from_numpy(arr[:, :num_joints]).float(), float(data["dt"][0])
-    # return torch.from_numpy(arr[:, [0,1,2,3,4,9,10]]).float(), float(data["dt"][0])
+    # return torch.from_numpy(arr[150:25*300, [0,1,2,3,4,9,10]]).float(), float(data["dt"][0])
 
 
 def main():
